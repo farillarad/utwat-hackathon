@@ -1,12 +1,7 @@
-// Owner: Farill — label rubric for the failure-mode classifier (the ML deliverable).
-export const FAILURE_MODES = [
-  "stuck_in_loop",
-  "fell_for_distractor",
-  "assumed_success_incorrectly",
-  "hijacked_by_injection",
-] as const;
+import { FAILURE_MODES, type FailureMode } from "../../../shared/schema/run";
 
-export type FailureMode = (typeof FAILURE_MODES)[number];
+// Owner: Farill — label rubric for the failure-mode classifier (the ML deliverable).
+export { FAILURE_MODES, type FailureMode };
 
 export const RUBRIC = `
 Given an agent's action trace for one gauntlet level and the ground-truth outcome,

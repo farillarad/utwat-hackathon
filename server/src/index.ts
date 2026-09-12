@@ -1,10 +1,12 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import eventsRouter from "./routes/events";
 import runsRouter from "./routes/runs";
-import { broadcastToScoreboard } from "./store/runStore";
+import { addEvent, broadcastToScoreboard, setScoreboardServer } from "./store/runStore";
+import type { GauntletEvent } from "../../shared/schema/events";
 
 const app = express();
 app.use(cors());
@@ -27,10 +29,18 @@ server.on("upgrade", (req, socket, head) => {
   }
 });
 
+setScoreboardServer(scoreboardWss);
+
 eventsWss.on("connection", (ws) => {
   ws.on("message", (raw) => {
-    const event = JSON.parse(raw.toString());
-    broadcastToScoreboard(scoreboardWss, { kind: "event", payload: event });
+    let event: GauntletEvent;
+    try {
+      event = JSON.parse(raw.toString());
+    } catch {
+      return; // malformed frame from a misbehaving agent shouldn't kill the run
+    }
+    addEvent(event);
+    broadcastToScoreboard({ kind: "event", payload: event });
   });
 });
 
