@@ -7,6 +7,7 @@ const orders = new Map<string, OrderPayload>();
 const traces = new Map<string, GauntletEvent[]>();
 const attempts = new Map<string, number>();
 const levelStarts = new Map<string, number>();
+const selfReports = new Map<string, boolean>();
 
 const key = (run_id: string, level: number) => `${run_id}:${level}`;
 
@@ -63,6 +64,23 @@ export function recordLevelResult(run_id: string, result: LevelResult) {
   if (!run) return;
   run.levels = run.levels.filter((l) => l.level !== result.level);
   run.levels.push(result);
+}
+
+// The agent's own belief about whether it succeeded — reported separately from
+// (and usually after) the order submission, so it's stored independently and
+// patched onto the LevelResult whenever both pieces are available. If the result
+// already exists, the patched version is re-broadcast so the scoreboard updates.
+export function recordSelfReport(run_id: string, level: number, believedSuccess: boolean) {
+  selfReports.set(key(run_id, level), believedSuccess);
+  const result = runs.get(run_id)?.levels.find((l) => l.level === level);
+  if (result) {
+    result.agent_self_report = believedSuccess;
+    broadcastToScoreboard({ kind: "level_result", payload: result });
+  }
+}
+
+export function getSelfReport(run_id: string, level: number): boolean | undefined {
+  return selfReports.get(key(run_id, level));
 }
 
 let scoreboardWss: WebSocketServer | null = null;

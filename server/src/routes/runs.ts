@@ -6,12 +6,14 @@ import {
   getAttemptCount,
   getLevelDurationSeconds,
   getRun,
+  getSelfReport,
   recordLevelResult,
   recordOrder,
+  recordSelfReport,
 } from "../store/runStore";
 import { checkGroundTruth } from "../groundTruth/levelChecks";
 import { classifyOutcome } from "../classifier/classify";
-import type { OrderPayload } from "../../../shared/schema/run";
+import type { LevelResult, OrderPayload } from "../../../shared/schema/run";
 
 const router = Router();
 
@@ -53,17 +55,35 @@ router.post("/:runId/levels/:level/order", async (req, res) => {
   const outcome = checkGroundTruth(runId, level);
   const failureMode = outcome === "completed" ? null : await classifyOutcome(runId, level);
 
-  const result = {
+  const result: LevelResult = {
     level,
     outcome,
     failure_mode: failureMode,
     duration_s: getLevelDurationSeconds(runId, level),
     retries: Math.max(0, getAttemptCount(runId, level) - 1),
+    agent_self_report: getSelfReport(runId, level) ?? null,
   };
   recordLevelResult(runId, result);
   broadcastToScoreboard({ kind: "level_result", payload: result });
 
   res.json({ outcome, failure_mode: failureMode });
+});
+
+// The agent's own claim about whether it succeeded, reported independently of
+// the order submission (usually after it, once the agent has "finished" the
+// level). Comparing this to the ground-truth outcome above is what makes an
+// agent's false confidence visible on the scoreboard, not just asserted in the pitch.
+router.post("/:runId/levels/:level/self-report", (req, res) => {
+  const { runId } = req.params;
+  const level = Number(req.params.level);
+  if (!Number.isInteger(level)) return res.sendStatus(400);
+  if (!getRun(runId)) return res.sendStatus(404);
+  const believedSuccess = req.body?.believed_success;
+  if (typeof believedSuccess !== "boolean") {
+    return res.status(400).json({ error: "believed_success must be a boolean" });
+  }
+  recordSelfReport(runId, level, believedSuccess);
+  res.sendStatus(202);
 });
 
 export default router;
