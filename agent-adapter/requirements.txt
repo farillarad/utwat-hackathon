@@ -1,4 +1,5 @@
-browser-use
-playwright
-anthropic
-requests
+browser-use>=0.13,<0.14
+playwright>=1.48
+anthropic>=0.40
+requests>=2.32
+python-dotenv>=1.0

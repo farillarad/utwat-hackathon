@@ -1,297 +1,996 @@
-/* Judge-facing dashboard. Deliberately a different register from the gauntlet's
-   plain "real shop" look — this is the control-room view of what the agent is
-   doing, so it leans dark/technical rather than trying to look like a website. */
+/* Gauntlet scoreboard — control-room timing board, read from across a room.
+   Color discipline: one hot accent (--live, amber) for general emphasis;
+   --fail is the single most saturated color on the page, reserved for the
+   failure itself; --pass is deliberately desaturated so it reads as "cleared"
+   rather than competing with the failure for attention. */
 
 :root {
-  --bg: #0b0e14;
-  --panel: #12161f;
-  --panel-raised: #171c27;
-  --border: #232936;
-  --text: #e6e9ef;
-  --muted: #7a8394;
-  --accent: #4c8dff;
-  --pass: #2fd889;
-  --fail: #ff5c6c;
-  --pending: #3a4356;
-  --warn: #ffb454;
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --mono: "SF Mono", "Fira Code", ui-monospace, Menlo, Consolas, monospace;
+  --bg: #0f141b;
+  --panel: #171d26;
+  --panel-2: #1e2631;
+  --line: #2b3542;
+  --text: #e9edf2;
+  --muted: #8a95a5;
+  --pass: #7fa08f;
+  --fail: #ff3b30;
+  --fail-dim: #7a4642;
+  --live: #ffc65c;
+  --pending: #3a4452;
+
+  --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --body: "Barlow", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-body {
+html,
+body,
+#root {
+  height: 100%;
   margin: 0;
+}
+
+body {
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font);
+  font-family: var(--body);
   font-size: 15px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  position: relative;
 }
 
-.scoreboard {
+/* One texture layer — faint scanlines to break up the flat fills. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.025) 0px,
+    rgba(255, 255, 255, 0.025) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  background: var(--panel-2);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+}
+
+button {
+  font: inherit;
+}
+
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--live);
+  outline-offset: 2px;
+}
+
+/* ---- Board frame ---------------------------------------------------- */
+
+.board {
+  height: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 18px 24px 24px;
   gap: 16px;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 20px;
-  min-height: 100vh;
+  overflow: hidden; /* header stays pinned; .comparison below scrolls itself if needed */
 }
 
-.scoreboard-header {
-  grid-column: 1 / -1;
+.board__head {
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;
   justify-content: space-between;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
 }
 
-.scoreboard-title {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.scoreboard-title span {
-  color: var(--accent);
-}
-
-.scoreboard-subtitle {
-  font-size: 13px;
+.board__eyebrow {
+  display: block;
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
   color: var(--muted);
 }
 
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px;
+.board__title h1 {
+  font-size: 34px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
-.panel-title {
-  margin: 0 0 12px;
-  font-size: 12px;
-  font-weight: 700;
+.board__status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 11px;
   text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text);
+}
+
+.pill__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pending);
+}
+
+.pill--live .pill__dot {
+  background: var(--pass);
+  box-shadow: 0 0 0 3px rgba(127, 160, 143, 0.25);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.pill--connecting .pill__dot {
+  background: var(--live);
+}
+
+.pill--offline .pill__dot {
+  background: var(--fail);
+}
+
+.btn {
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn:hover {
+  border-color: var(--muted);
+}
+
+.btn--quiet {
+  background: transparent;
+  color: var(--muted);
+}
+
+/* ---- Empty state ---------------------------------------------------- */
+
+.empty {
+  display: grid;
+  place-content: center;
+}
+
+.empty__panel {
+  display: grid;
+  gap: 10px;
+  text-align: center;
+  max-width: 62ch;
+  padding: 28px 32px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--muted);
+}
+
+.empty__status {
+  justify-self: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--live);
+  border: 1px solid rgba(255, 198, 92, 0.4);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.empty__lead {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 28px;
+  color: var(--text);
+}
+
+.empty__hint {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* ---- Comparison board ------------------------------------------------
+   One shared surface for every run instead of N full dashboard clones:
+   one score readout, one ladder axis, one detail pane, one trace log. */
+
+.comparison {
+  display: grid;
+  grid-template-rows: auto auto auto auto;
+  gap: 16px;
+  min-height: 0;
+  /* With up to 4 rows, score+axis+detail+trace can exceed the viewport even
+     though each individual piece is compact. Scroll the whole surface rather
+     than silently clipping content the way a fixed-height, overflow:hidden
+     board would — the header above stays pinned since it's outside this. */
+  overflow-y: auto;
+}
+
+/* ---- Shared ladder axis ------------------------------------------------
+   Levels 1-6 are fixed, equal-width columns spanning the full width; every
+   run is a row plotted against that same axis, so a run dying at L5 and one
+   stalling at L2 read as different positions on one shared scale — not two
+   separate, incomparable thumbnails. */
+
+.axis {
+  display: grid;
+  gap: 4px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 18px 6px;
+}
+
+.axis__header {
+  display: grid;
+  grid-template-columns: 200px 74px 1fr;
+  gap: 16px;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.axis__track--header {
+  position: relative;
+  height: 14px;
+}
+
+.axis__col-label {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--muted);
 }
 
-.ladder-panel {
-  display: flex;
-  flex-direction: column;
+.axis__row {
+  display: grid;
+  grid-template-columns: 200px 74px 1fr;
   gap: 16px;
+  align-items: center;
+  padding: 8px 8px 8px 12px;
+  margin: 0 -8px;
+  border-radius: 8px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.axis__row:not(:last-child) {
+  border-bottom: 1px solid var(--line);
+}
+
+.axis__row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Selection needs to be unambiguous at a glance: accent border + tinted
+   background on the row, not just a subtle tone shift. */
+.axis__row--selected {
+  background: rgba(255, 198, 92, 0.08);
+  border-left-color: var(--live);
+}
+
+.axis__row--selected:hover {
+  background: rgba(255, 198, 92, 0.11);
+}
+
+.axis__runner {
+  display: grid;
+  gap: 4px;
   min-width: 0;
 }
 
-/* Agent live view */
-
-.agent-view {
-  display: flex;
-  flex-direction: column;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-  min-height: 420px;
-}
-
-.agent-view-chrome {
+.axis__runner-top {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  padding: 10px 12px;
-  background: var(--panel-raised);
-  border-bottom: 1px solid var(--border);
 }
 
-.agent-view-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--pending);
-}
-
-.agent-view-url {
-  flex: 1;
-  margin-left: 8px;
-  padding: 4px 10px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--muted);
+.axis__runner-name {
+  font-family: var(--display);
+  font-size: 19px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.agent-view-body {
-  flex: 1;
+.axis__leader {
+  color: var(--live);
+  margin-right: 4px;
+  font-size: 15px;
+}
+
+.axis__dismiss {
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.axis__dismiss:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.axis__runner-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.axis__runner-stats strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.axis__runner-stats-fail {
+  color: var(--fail);
+}
+
+/* Per-row score — replaces the old separate top score strip. */
+.axis__score {
+  display: grid;
+  justify-items: end;
+  text-align: right;
+}
+
+.axis__score-value {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.axis__score-max {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.axis__score-detail {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.axis__track {
+  position: relative;
+  height: 34px;
+}
+
+.axis__rail {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  transform: translateY(-50%);
+  background-image: repeating-linear-gradient(to right, var(--pending) 0 5px, transparent 5px 9px);
+}
+
+.axis__rail-fill {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  height: 2px;
+  transform: translateY(-50%);
+  background: var(--pass);
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Flat and desaturated by default — only the selected run's severance
+   marker (below) gets full saturation and the glow. Unselected failures are
+   still visible, just not competing for attention. */
+.axis__break {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  border-right: 2px solid var(--fail-dim);
+  border-bottom: 2px solid var(--fail-dim);
+  cursor: pointer;
+  transition: left 0.6s cubic-bezier(0.22, 1, 0.36, 1), width 0.3s ease, height 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.axis__break--selected {
+  width: 13px;
+  height: 13px;
+  border-right-color: var(--fail);
+  border-bottom-color: var(--fail);
+  animation: axis-break-pulse 1.6s ease-in-out infinite;
+}
+
+/* Ended without failing but never reached the last level — distinct from
+   both a live run's dashed "hasn't gotten there yet" and the diamond
+   severance marker used for an actual failure. */
+.axis__endcap {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: 18px;
+  background: var(--muted);
+  border-radius: 2px;
+}
+
+.axis__endcap-label {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+@keyframes axis-break-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgba(255, 59, 48, 0.6));
+  }
+  50% {
+    filter: drop-shadow(0 0 5px rgba(255, 59, 48, 0.6));
+  }
+}
+
+.axis__node {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--panel-2);
+  border: 2px solid var(--pending);
   color: var(--muted);
-  font-size: 13px;
-  gap: 10px;
+  transition: all 0.4s ease;
 }
 
-.agent-view-pulse {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: pulse 1.4s ease-in-out infinite;
+.axis__node--locked {
+  opacity: 0.4;
 }
+
+.axis__node--current {
+  border-color: var(--live);
+  color: var(--live);
+  background: rgba(255, 198, 92, 0.15);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.axis__node--pass {
+  border-color: var(--pass);
+  color: var(--pass);
+  background: rgba(127, 160, 143, 0.14);
+}
+
+/* Full saturation + glow: only the selected run's failure looks like this. */
+.axis__node--fail {
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  border-color: var(--fail);
+  background: var(--fail);
+  color: #1a0906;
+  box-shadow: 0 0 0 6px rgba(255, 59, 48, 0.15), 0 0 20px rgba(255, 59, 48, 0.55);
+}
+
+/* Flat and desaturated: every other run's failure, so exactly one marker on
+   the board reads as "the finding," not all of them at once. */
+.axis__node--fail-dim {
+  border-color: var(--fail-dim);
+  color: var(--fail-dim);
+  background: rgba(122, 70, 66, 0.14);
+}
+
+/* ---- Selection detail row: video feed | failure hero ------------------- */
+
+.comparison__detail {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.comparison__detail > *:only-child {
+  grid-column: 1 / -1;
+}
+
+/* ---- Browser view --------------------------------------------------- */
+
+.browser {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0b0f14;
+}
+
+.browser__chrome {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.browser__dots {
+  width: 34px;
+  height: 8px;
+  background: radial-gradient(circle at 4px 4px, var(--pending) 3px, transparent 3.5px) 0 0 / 13px 8px repeat-x;
+}
+
+.browser__url {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.browser__live {
+  color: var(--live);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 10px;
+}
+
+.browser__viewport {
+  aspect-ratio: 16 / 10;
+  display: grid;
+  place-items: center;
+}
+
+/* When showing the per-level breakdown instead of a frame, don't force it
+   into a centered blob inside an aspect-ratio box — that's what made this
+   panel read as a tall empty box in the first place. Let it fill the space
+   top-to-bottom instead. */
+.browser__viewport--summary {
+  aspect-ratio: auto;
+  min-height: 300px;
+  display: block;
+}
+
+.browser__viewport img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.browser__empty {
+  margin: 0;
+  padding: 24px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.browser__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  padding: 16px 20px;
+}
+
+.browser__summary-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.browser__summary-status {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.browser__summary-score {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 1;
+  color: var(--live);
+}
+
+.browser__summary-max {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* Per-level timing breakdown — fills the space a bare "waiting" placeholder
+   used to leave empty, and doubles as a quick per-level readout for the
+   selected run even once a frame is available for other runs. */
+.browser__breakdown {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.browser__breakdown-row {
+  display: grid;
+  grid-template-columns: 34px 56px 1fr;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.browser__breakdown-row:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.browser__breakdown-level {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.browser__breakdown-row--completed .browser__breakdown-outcome {
+  color: var(--pass);
+}
+
+.browser__breakdown-row--failed .browser__breakdown-outcome {
+  color: var(--fail);
+  font-weight: 700;
+}
+
+/* ---- Failure hero ------------------------------------------------------
+   The board's one failure detail panel, driven by whichever run is
+   selected. Nothing else on the board uses --fail at this weight/scale. */
+
+.failure-hero {
+  border: 1px solid rgba(255, 59, 48, 0.45);
+  background: linear-gradient(180deg, rgba(255, 59, 48, 0.1), rgba(255, 59, 48, 0.02));
+  border-radius: 10px;
+  padding: 16px 18px;
+  box-shadow: 0 0 0 1px rgba(255, 59, 48, 0.08), 0 10px 28px rgba(255, 59, 48, 0.12);
+}
+
+.failure-hero-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.failure-hero-kicker {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fail);
+}
+
+.failure-hero-mode {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  text-transform: uppercase;
+}
+
+/* The core finding of the project: what the agent believed vs. what
+   actually happened. Deliberately the second-most prominent thing in the
+   card — a full-width block, not a small inline chip, directly under the
+   failure-mode heading. */
+.failure-hero-belief {
+  display: block;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.failure-hero-belief strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+.failure-hero-belief[data-mismatch="true"] {
+  border-color: rgba(255, 198, 92, 0.55);
+  background: rgba(255, 198, 92, 0.08);
+}
+
+.failure-hero-belief[data-mismatch="true"] strong {
+  color: var(--live);
+}
+
+.failure-hero-belief-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--live);
+  color: var(--bg);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  vertical-align: middle;
+}
+
+.failure-hero-belief-pending {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+  font-style: italic;
+}
+
+.failure-hero-trace {
+  margin: 0;
+  padding: 8px 10px;
+  background: #0b0f14;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-x: auto;
+  /* Enough context to fill the card instead of leaving a gap below a short
+     excerpt, capped so a chatty level scrolls internally instead of growing
+     the whole card unbounded. */
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* ---- Trace log ------------------------------------------------------
+   One merged, full-width log instead of one per run. Rows wrap instead of
+   clipping — a narrow column truncating mid-word is exactly what this
+   replaces. */
+
+.trace {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  /* Fixed height (not "whatever's left") so the log always gets its own
+     compact, internally-scrolling pane regardless of how many rows are
+     above it — new events auto-scroll within this box, not the whole page. */
+  height: 280px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0b0f14;
+  overflow: hidden;
+}
+
+.trace__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+
+.trace__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.trace__filter {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 9px;
+  cursor: pointer;
+}
+
+.trace__filter:hover {
+  border-color: var(--muted);
+  color: var(--text);
+}
+
+.trace__filter.src-a,
+.trace__filter.src-b,
+.trace__filter.src-c,
+.trace__filter.src-d {
+  border-color: currentColor;
+}
+
+.trace__filter.trace__filter--active {
+  color: var(--bg);
+  background: var(--live);
+  border-color: var(--live);
+  font-weight: 700;
+}
+
+.trace__count {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.trace__list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0;
+  overflow-y: auto;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+.trace__row {
+  display: grid;
+  grid-template-columns: 150px 30px 66px 1fr;
+  gap: 10px;
+  padding: 4px 12px;
+  color: var(--text);
+}
+
+.trace__row:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.trace__source {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.src-a {
+  color: #6fb3ff;
+}
+
+.src-b {
+  color: #ff9f6e;
+}
+
+.src-c {
+  color: #b39cff;
+}
+
+.src-d {
+  color: #6fe0c9;
+}
+
+.trace__level,
+.trace__ts {
+  color: var(--muted);
+}
+
+.trace__what {
+  overflow-wrap: anywhere;
+}
+
+.trace__row--level_start .trace__what,
+.trace__row--level_end .trace__what {
+  color: var(--live);
+}
+
+.trace__row--dom_mutation .trace__what {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.trace__empty {
+  padding: 10px 12px;
+  color: var(--muted);
+}
+
+/* ---- Motion --------------------------------------------------------- */
 
 @keyframes pulse {
   0%,
   100% {
-    opacity: 0.35;
-    transform: scale(0.85);
+    opacity: 1;
   }
   50% {
-    opacity: 1;
-    transform: scale(1);
+    opacity: 0.45;
   }
 }
 
-/* Ladder */
-
-.ladder {
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+@media (prefers-reduced-motion: reduce) {
+  .pill--live .pill__dot,
+  .axis__node--current,
+  .axis__break {
+    animation: none;
+  }
 }
 
-.rung {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--panel-raised);
-}
+@media (max-width: 900px) {
+  .comparison__detail {
+    grid-template-columns: 1fr;
+  }
 
-.rung::before {
-  content: "";
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: var(--pending);
-}
-
-.rung-pass::before {
-  background: var(--pass);
-  box-shadow: 0 0 0 3px rgba(47, 216, 137, 0.18);
-}
-
-.rung-fail::before {
-  background: var(--fail);
-  box-shadow: 0 0 0 3px rgba(255, 92, 108, 0.18);
-}
-
-.rung > span:first-of-type {
-  font-weight: 700;
-  font-size: 13px;
-  min-width: 64px;
-}
-
-.rung-pass {
-  border-color: rgba(47, 216, 137, 0.35);
-}
-
-.rung-fail {
-  border-color: rgba(255, 92, 108, 0.35);
-}
-
-.failure-mode {
-  font-family: var(--mono);
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--bg);
-  color: var(--muted);
-  border: 1px solid var(--border);
-}
-
-.rung-fail .failure-mode {
-  color: var(--fail);
-  border-color: rgba(255, 92, 108, 0.35);
-}
-
-.rung-pass .failure-mode {
-  color: var(--pass);
-  border-color: rgba(47, 216, 137, 0.35);
-}
-
-.self-report {
-  margin-left: auto;
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.self-report-mismatch {
-  color: var(--warn);
-  font-weight: 700;
-}
-
-/* Trace log */
-
-.trace-log {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  max-height: 260px;
-  overflow-y: auto;
-  font-family: var(--mono);
-  font-size: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.trace-log li {
-  padding: 3px 8px;
-  border-radius: 4px;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.trace-log li:nth-child(odd) {
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.trace-event-click {
-  color: var(--accent);
-}
-
-.trace-event-input {
-  color: #b39dff;
-}
-
-.trace-event-nav {
-  color: #4fd1c5;
-}
-
-.trace-event-dom_mutation {
-  color: var(--warn);
-}
-
-.trace-event-level_start,
-.trace-event-level_end {
-  color: var(--muted);
-  font-weight: 700;
+  .axis__header,
+  .axis__row {
+    grid-template-columns: 140px 1fr;
+  }
 }

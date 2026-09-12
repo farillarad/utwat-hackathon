@@ -1,42 +1,51 @@
-import Ladder from "./components/Ladder";
-import TraceLog from "./components/TraceLog";
-import AgentView from "./components/AgentView";
+import ComparisonBoard from "./components/ComparisonBoard";
 import { useRunStream } from "./ws/useRunStream";
 
-// Ladder Score per PRD §10: highest level cleanly completed x10, minus a
-// per-level-capped retry penalty summed across completed levels.
-function ladderScore(levels: { level: number; outcome: string; retries?: number }[]) {
-  const completed = levels.filter((l) => l.outcome === "completed");
-  const highest = completed.reduce((max, l) => Math.max(max, l.level), 0);
-  const retryPenalty = completed.reduce((sum, l) => sum + Math.min(5, l.retries ?? 0), 0);
-  return highest * 10 - retryPenalty;
-}
+const MAX_ROWS = 4;
 
 export default function App() {
-  const { levels, events } = useRunStream();
+  const { runs, connection, dismiss, clearAll } = useRunStream();
+  // Newest runs win the screen; older ones are still in memory and reappear when a row is dismissed.
+  const visible = runs.slice(-MAX_ROWS);
 
   return (
-    <div className="scoreboard">
-      <header className="scoreboard-header">
-        <div>
-          <div className="scoreboard-title">
-            Agent Stress-Test <span>Gauntlet</span>
-          </div>
-          <div className="scoreboard-subtitle">Live robustness profile</div>
+    <div className="board">
+      <header className="board__head">
+        <div className="board__title">
+          <span className="board__eyebrow">Agent stress-test</span>
+          <h1>Gauntlet</h1>
         </div>
-        <div className="scoreboard-subtitle">Ladder Score: {ladderScore(levels)}</div>
+        <div className="board__status">
+          <span className={`pill pill--${connection}`}>
+            <i className="pill__dot" />
+            {connection === "live" ? "Live feed" : connection === "connecting" ? "Connecting" : "Feed offline"}
+          </span>
+          <span className="board__count">
+            {runs.length === 0 ? "No runs" : `${runs.length} run${runs.length === 1 ? "" : "s"}`}
+          </span>
+          {runs.length > 0 && (
+            <button className="btn" onClick={clearAll}>
+              Clear board
+            </button>
+          )}
+        </div>
       </header>
-      <AgentView />
-      <div className="ladder-panel">
-        <section className="panel">
-          <h2 className="panel-title">Ladder</h2>
-          <Ladder levels={levels} />
+
+      {visible.length === 0 ? (
+        <section className="empty">
+          <div className="empty__panel">
+            <span className="empty__status">Standing by</span>
+            <p className="empty__lead">Waiting for an agent to start a run.</p>
+            <p className="empty__hint">
+              Point an adapter at the gauntlet: <code>python agent-adapter/raw_llm_loop.py</code> or{" "}
+              <code>python agent-adapter/browser_use_runner.py</code>. To replay a stored run:{" "}
+              <code>npx tsx scripts/replay-run.ts data/runs/&lt;file&gt;.json</code>
+            </p>
+          </div>
         </section>
-        <section className="panel">
-          <h2 className="panel-title">Trace</h2>
-          <TraceLog events={events} />
-        </section>
-      </div>
+      ) : (
+        <ComparisonBoard runs={visible} onDismiss={dismiss} />
+      )}
     </div>
   );
 }
