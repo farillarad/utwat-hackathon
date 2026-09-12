@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import AgentView from "./AgentView";
 import Ladder from "./Ladder";
 import TraceLog from "./TraceLog";
@@ -8,8 +9,40 @@ interface Props {
   onDismiss: () => void;
 }
 
+// Counts the displayed score up (or down) to its new value instead of snapping —
+// display only; the score itself comes from ladderScore(). (Tanay's touch.)
+function useCountUp(value: number, duration = 500) {
+  const [display, setDisplay] = useState(value);
+  const fromRef = useRef(value);
+
+  useEffect(() => {
+    const from = fromRef.current;
+    if (from === value) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) {
+      fromRef.current = value;
+      setDisplay(value);
+      return;
+    }
+    const start = performance.now();
+    let raf: number;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplay(Math.round(from + (value - from) * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+      else fromRef.current = value;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value, duration]);
+
+  return display;
+}
+
 export default function RunLane({ run, onDismiss }: Props) {
   const { score, highest, penalty } = ladderScore(run.levels);
+  const shownScore = useCountUp(score);
   const failed = run.levels.find((l) => l.outcome === "failed" && l.level > highest);
 
   return (
@@ -21,7 +54,7 @@ export default function RunLane({ run, onDismiss }: Props) {
         </div>
         <div className="score">
           <span className="score__label">Ladder score</span>
-          <span className="score__value">{score}</span>
+          <span className="score__value">{shownScore}</span>
           <span className="score__detail">
             {highest > 0 ? `L${highest} × 10` : "no level passed"}
             {penalty > 0 && ` − ${penalty} retr${penalty === 1 ? "y" : "ies"}`}
