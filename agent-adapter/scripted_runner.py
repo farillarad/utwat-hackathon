@@ -1,6 +1,6 @@
 """Owner: Amir — a no-LLM "agent" that drives the gauntlet with fixed Playwright steps.
 
-Not a contestant. It exists so the adapter → gauntlet → server → scoreboard pipeline
+Not a contestant. It exists so the adapter -> gauntlet -> server -> scoreboard pipeline
 (including the live browser view) can be tested end to end without an API key, and
 so the team can produce a deterministic backup run for replay.
 

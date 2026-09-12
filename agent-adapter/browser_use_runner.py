@@ -55,7 +55,7 @@ async def main() -> int:
     client = GauntletClient()
     run_id = client.start_run(args.agent_name, levels[0])
     summary = RunSummary(run_id, args.agent_name)
-    print(f"run {run_id} → {client.level_url(run_id, levels[0])}")
+    print(f"run {run_id} -> {client.level_url(run_id, levels[0])}")
 
     llm = ChatAnthropic(model=args.model, temperature=0.0)
     browser = Browser(headless=args.headless, keep_alive=True, window_size={"width": 1280, "height": 800})

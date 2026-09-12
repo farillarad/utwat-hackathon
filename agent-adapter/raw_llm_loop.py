@@ -127,7 +127,7 @@ def main() -> int:
     client = GauntletClient()
     run_id = client.start_run(args.agent_name, levels[0])
     summary = RunSummary(run_id, args.agent_name)
-    print(f"run {run_id} → {client.level_url(run_id, levels[0])}")
+    print(f"run {run_id} -> {client.level_url(run_id, levels[0])}")
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=args.headless)
