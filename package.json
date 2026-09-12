@@ -1,0 +1,18 @@
+{
+  "name": "agent-stress-test-gauntlet",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "server"
+  ],
+  "scripts": {
+    "dev:gauntlet": "npm run dev -w apps/gauntlet",
+    "dev:scoreboard": "npm run dev -w apps/scoreboard",
+    "dev:server": "npm run dev -w server",
+    "dev": "npm-run-all --parallel dev:gauntlet dev:scoreboard dev:server"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5"
+  }
+}
