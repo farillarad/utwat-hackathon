@@ -20,6 +20,11 @@ export const AXIS_POSITIONS = LADDER_LEVELS.map(
   (_, i) => AXIS_MARGIN + (i / (LADDER_LEVELS.length - 1)) * (100 - 2 * AXIS_MARGIN)
 );
 
+// Minor tick at the midpoint between each pair of adjacent major (level)
+// positions — a measurement-scale detail on the header ruler only, not
+// repeated on every row (that would just be noise).
+const MINOR_TICK_POSITIONS = AXIS_POSITIONS.slice(0, -1).map((p, i) => (p + AXIS_POSITIONS[i + 1]) / 2);
+
 const FLARE_MS = 500;
 const SHAKE_MS = 400;
 const CURRENT_ENTER_MS = 400;
@@ -43,13 +48,25 @@ interface RowProps {
   selected: boolean;
   isLeader: boolean;
   showLeader: boolean;
+  topScore: number;
   replay: ReplayState | null;
   reducedMotion: boolean;
   onSelect: () => void;
   onDismiss: () => void;
 }
 
-function AxisRow({ run, label, selected, isLeader, showLeader, replay, reducedMotion, onSelect, onDismiss }: RowProps) {
+function AxisRow({
+  run,
+  label,
+  selected,
+  isLeader,
+  showLeader,
+  topScore,
+  replay,
+  reducedMotion,
+  onSelect,
+  onDismiss,
+}: RowProps) {
   const byLevel = new Map(run.levels.map((l) => [l.level, l]));
   const currentLevel = run.ended ? null : run.current_level;
   const stages = LADDER_LEVELS.map((level) => stageFor(level, byLevel.get(level), currentLevel));
@@ -71,6 +88,7 @@ function AxisRow({ run, label, selected, isLeader, showLeader, replay, reducedMo
   const passCount = run.levels.filter((l) => l.outcome === "completed").length;
   const failCount = run.levels.filter((l) => l.outcome === "failed").length;
   const totalDuration = run.levels.reduce((sum, l) => sum + (l.duration_s ?? 0), 0);
+  const delta = score - topScore;
 
   // Only render the pip once replay has actually been engaged — otherwise
   // it'd sit motionless at the start as a static idle marker whenever this
@@ -82,6 +100,14 @@ function AxisRow({ run, label, selected, isLeader, showLeader, replay, reducedMo
   // playback controls are already disabled.
   const isReplaying = !reducedMotion && selected && replay !== null && (replay.isPlaying || replay.currentTime > 0);
   const pipAtEnd = isReplaying && replay!.atEnd;
+
+  // A caliper spanning the failed level's own column, labeled with that
+  // level's duration — only for the selected run, so it doesn't turn into
+  // clutter across every failed row on the board.
+  const failedResult = isFailed ? byLevel.get(LADDER_LEVELS[firstFailureIndex]) : undefined;
+  const showCaliper = selected && isFailed && firstFailureIndex > 0;
+  const caliperStart = showCaliper ? AXIS_POSITIONS[firstFailureIndex - 1] : 0;
+  const caliperEnd = showCaliper ? AXIS_POSITIONS[firstFailureIndex] : 0;
 
   return (
     // FLIP (reorder) drives this element's transform imperatively; the shake
@@ -146,11 +172,26 @@ function AxisRow({ run, label, selected, isLeader, showLeader, replay, reducedMo
             {highest > 0 ? `L${highest} × 10` : "—"}
             {penalty > 0 && ` −${penalty}`}
           </span>
+          {showLeader && (
+            <span className={`axis__score-delta${isLeader ? " axis__score-delta--lead" : ""}`}>
+              {isLeader ? "leader" : `${delta} vs leader`}
+            </span>
+          )}
         </div>
 
         <div className="axis__track">
           <div className="axis__rail" />
           <div className="axis__rail-fill" style={{ width: `${filledPercent}%` }} />
+          {showCaliper && (
+            <div
+              className="axis__caliper"
+              style={{ left: `${caliperStart}%`, width: `${caliperEnd - caliperStart}%` }}
+            >
+              <span className="axis__caliper-tick axis__caliper-tick--start" />
+              <span className="axis__caliper-tick axis__caliper-tick--end" />
+              <span className="axis__caliper-label">{(failedResult?.duration_s ?? 0).toFixed(1)}s</span>
+            </div>
+          )}
           {isFailed && (
             <span
               className={`axis__break${selected ? " axis__break--selected" : ""}${
@@ -227,11 +268,20 @@ export default function LadderAxis({ runs, selectedRunId, replay, onSelect, onDi
   const topScore = sorted.reduce((best, r) => Math.max(best, ladderScore(r.levels).score), 0);
 
   return (
-    <div className="axis panel panel--chamfer" ref={containerRef}>
+    <div className="axis panel panel--frame panel--chamfer" ref={containerRef}>
+      <div className="axis__title rule-label">
+        <span>Run progress</span>
+      </div>
       <div className="axis__header">
         <span className="axis__runner-col" aria-hidden />
         <span className="axis__score-col" aria-hidden />
         <div className="axis__track axis__track--header">
+          {MINOR_TICK_POSITIONS.map((pos, i) => (
+            <span key={`minor-${i}`} className="axis__tick axis__tick--minor" style={{ left: `${pos}%` }} />
+          ))}
+          {LADDER_LEVELS.map((level, i) => (
+            <span key={level} className="axis__tick axis__tick--major" style={{ left: `${AXIS_POSITIONS[i]}%` }} />
+          ))}
           {LADDER_LEVELS.map((level, i) => (
             <span key={level} className="axis__col-label" style={{ left: `${AXIS_POSITIONS[i]}%` }}>
               L{level}
@@ -248,6 +298,7 @@ export default function LadderAxis({ runs, selectedRunId, replay, onSelect, onDi
           selected={run.run_id === selectedRunId}
           isLeader={ladderScore(run.levels).score === topScore && topScore > 0}
           showLeader={runs.length > 1}
+          topScore={topScore}
           replay={run.run_id === selectedRunId ? replay : null}
           reducedMotion={reducedMotion}
           onSelect={() => onSelect(run.run_id)}

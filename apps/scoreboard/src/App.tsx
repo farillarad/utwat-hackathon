@@ -68,7 +68,7 @@ export default function App() {
 
       {visible.length === 0 ? (
         <section className="empty">
-          <div className="empty__panel panel panel--chamfer">
+          <div className="empty__panel panel panel--frame panel--chamfer">
             <span className="empty__status">Standing by</span>
             <p className="empty__lead">Waiting for an agent to start a run.</p>
             <p className="empty__hint">

@@ -91,6 +91,19 @@ body::before {
   );
 }
 
+/* Subtle vignette — darkens the viewport edges slightly so the center of
+   the board (where the axis and failure card live) reads as the focal
+   plane. A second, separate layer from the scanlines above; still applied
+   once, globally. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.35) 100%);
+}
+
 #root {
   position: relative;
   z-index: 1;
@@ -124,19 +137,30 @@ button:focus-visible,
 }
 
 /* ---- Panel material ---------------------------------------------------
-   Every panel on the board shares this recipe: near-black base, a hairline
-   border, a 1px inner top highlight so it reads as a physical plate, sharp
-   corners, and no drop shadow — separation comes from border/value
-   contrast, not elevation. .panel--chamfer cuts the two "major panel"
-   corners for the instrument-panel look; smaller panels stay plain. */
+   Every panel shares a near-black base, sharp corners, and no drop shadow —
+   separation comes from border/value contrast, not elevation. Two distinct
+   framing treatments on top of that base, matching primary vs. secondary
+   panels rather than applying the same border everywhere as an effect:
+     .panel--frame   full hairline border + 1px inner top highlight
+                     (the axis, the failure card, the empty state — the
+                     panels the eye should land on first)
+     .panel--bracket short corner brackets only, no continuous border
+                     (replay controls, the browser/breakdown view, the
+                     trace log — secondary, quieter framing)
+   .panel--chamfer clips two corners (top-left, bottom-right) via
+   clip-path for the "machined" instrument-panel look; applied to the
+   frame-tier panels only. */
 .panel {
   position: relative;
   background: var(--bg-panel);
-  border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
 }
 
-.panel::before {
+.panel--frame {
+  border: 1px solid var(--hairline);
+}
+
+.panel--frame::before {
   content: "";
   position: absolute;
   top: 0;
@@ -147,12 +171,47 @@ button:focus-visible,
   pointer-events: none;
 }
 
+.panel--bracket {
+  --bracket: 10px;
+  background-image: linear-gradient(var(--hairline), var(--hairline)) top left / var(--bracket) 1px no-repeat,
+    linear-gradient(var(--hairline), var(--hairline)) top left / 1px var(--bracket) no-repeat,
+    linear-gradient(var(--hairline), var(--hairline)) top right / var(--bracket) 1px no-repeat,
+    linear-gradient(var(--hairline), var(--hairline)) top right / 1px var(--bracket) no-repeat,
+    linear-gradient(var(--hairline), var(--hairline)) bottom left / var(--bracket) 1px no-repeat,
+    linear-gradient(var(--hairline), var(--hairline)) bottom left / 1px var(--bracket) no-repeat,
+    linear-gradient(var(--hairline), var(--hairline)) bottom right / var(--bracket) 1px no-repeat,
+    linear-gradient(var(--hairline), var(--hairline)) bottom right / 1px var(--bracket) no-repeat;
+  background-color: var(--bg-panel);
+}
+
 .panel--chamfer {
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
 }
 
 .panel--inset {
   background: var(--bg-inset);
+}
+
+/* Technical-drawing convention: a rule running from the label to the panel
+   edge, the label sitting in the gap rather than a heading floating above
+   a full-width underline. */
+.rule-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--text-dim);
+  opacity: 0.7;
+}
+
+.rule-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--hairline);
 }
 
 /* ---- Board frame ------------------------------------------------------- */
@@ -353,6 +412,10 @@ button:focus-visible,
   padding: 10px 20px 6px 16px;
 }
 
+.axis__title {
+  margin-bottom: 8px;
+}
+
 .axis__header {
   display: grid;
   grid-template-columns: 200px 74px 1fr;
@@ -364,7 +427,7 @@ button:focus-visible,
 
 .axis__track--header {
   position: relative;
-  height: 14px;
+  height: 24px;
 }
 
 .axis__col-label {
@@ -375,6 +438,25 @@ button:focus-visible,
   font-size: 10px;
   letter-spacing: 0.1em;
   color: var(--text-dim);
+}
+
+/* Measurement-scale ticks on the header ruler — taller at each level
+   column, shorter at the midpoints between them. */
+.axis__tick {
+  position: absolute;
+  bottom: 0;
+  width: 1px;
+  background: var(--hairline);
+  transform: translateX(-50%);
+}
+
+.axis__tick--major {
+  height: 9px;
+}
+
+.axis__tick--minor {
+  height: 4px;
+  opacity: 0.6;
 }
 
 /* Split into an outer (position/selection chrome) and an inner (grid layout)
@@ -513,7 +595,16 @@ button:focus-visible,
   color: var(--fail);
 }
 
-/* Per-row score — replaces the old separate top score strip. */
+/* Per-row score — replaces the old separate top score strip. A vertical
+   hairline on both the score cell and its header spacer reads as one
+   continuous rule down the panel, gridding the identity block (name+score)
+   off from the rail area — "instrumentation," not a plain list. */
+.axis__score,
+.axis__score-col {
+  padding-right: 16px;
+  border-right: 1px solid var(--hairline);
+}
+
 .axis__score {
   display: grid;
   justify-items: end;
@@ -522,8 +613,8 @@ button:focus-visible,
 
 .axis__score-value {
   font-family: var(--mono);
-  font-weight: 700;
-  font-size: 22px;
+  font-weight: 800;
+  font-size: 30px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
@@ -541,32 +632,50 @@ button:focus-visible,
   color: var(--text-dim);
 }
 
+.axis__score-delta {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--fail-dim);
+  margin-top: 2px;
+}
+
+.axis__score-delta--lead {
+  color: var(--accent);
+  font-weight: 700;
+}
+
 .axis__track {
   position: relative;
-  height: 34px;
+  /* Tall enough for the rail, its nodes, and the caliper dimension line
+     below it (selected+failed rows only) without overflowing into the
+     next row. */
+  height: 48px;
 }
 
-/* Idle track: a low-contrast dotted line (not a mid-gray dash) plus a faint
-   fixed-period tick pattern, like a measurement scale. */
+/* Idle track: a single, very low-contrast dotted line — the measurement-
+   scale ticks live on the header ruler as real elements now, so this
+   doesn't also need a tick pattern baked into its background. */
 .axis__rail {
   position: absolute;
-  top: 50%;
+  /* Anchored near the top of the (now taller) track, not dead-center — the
+     extra height goes toward the caliper dimension line below, not empty
+     space above the rail. */
+  top: 17px;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 4px;
   transform: translateY(-50%);
-  background-image: repeating-linear-gradient(to right, var(--idle) 0 1.5px, transparent 1.5px 7px),
-    repeating-linear-gradient(to right, var(--hairline) 0 1px, transparent 1px 22px);
-  opacity: 0.9;
+  background-image: repeating-linear-gradient(to right, var(--idle) 0 1.5px, transparent 1.5px 7px);
+  opacity: 0.6;
 }
 
-/* Reached track: a double line (two 1px rules with a gap) so it reads as a
-   track/bus rather than a plain filled bar. */
+/* Reached track: a double hairline — two 1px rules with a 2px gap — so it
+   reads as a track/bus rather than a plain filled bar. */
 .axis__rail-fill {
   position: absolute;
-  top: 50%;
+  top: 17px;
   left: 0;
-  height: 3px;
+  height: 4px;
   transform: translateY(-50%);
   background: linear-gradient(var(--pass), var(--pass)) 0 0 / 100% 1px no-repeat,
     linear-gradient(var(--pass), var(--pass)) 0 100% / 100% 1px no-repeat;
@@ -578,7 +687,7 @@ button:focus-visible,
    visible, just not competing for attention. */
 .axis__break {
   position: absolute;
-  top: 50%;
+  top: 17px;
   width: 9px;
   height: 9px;
   transform: translate(-50%, -50%) rotate(45deg);
@@ -623,7 +732,7 @@ button:focus-visible,
    severance marker used for an actual failure. */
 .axis__endcap {
   position: absolute;
-  top: 50%;
+  top: 17px;
   transform: translate(-50%, -50%);
   width: 3px;
   height: 18px;
@@ -643,13 +752,61 @@ button:focus-visible,
   white-space: nowrap;
 }
 
+/* Engineering-drawing dimension line: a caliper bracket spanning the failed
+   level's own column, labeled with that level's duration. Selected run
+   only, so it doesn't turn into clutter across every failed row. */
+.axis__caliper {
+  position: absolute;
+  top: 27px;
+  height: 16px;
+}
+
+.axis__caliper::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--text-dim);
+  opacity: 0.65;
+}
+
+.axis__caliper-tick {
+  position: absolute;
+  top: -1px;
+  width: 1px;
+  height: 5px;
+  background: var(--text-dim);
+  opacity: 0.65;
+}
+
+.axis__caliper-tick--start {
+  left: 0;
+}
+
+.axis__caliper-tick--end {
+  right: 0;
+}
+
+.axis__caliper-label {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
 /* Traversal pip — replay only. Position is driven every frame by JS while
    playing, so no CSS transition on `left`: a transition would constantly lag
    behind the rAF-driven target instead of tracking it. Manual scrubbing is
    the same instant-jump for the same reason. */
 .axis__pip {
   position: absolute;
-  top: calc(50% - 16px);
+  top: 1px;
   width: 8px;
   height: 8px;
   transform: translate(-50%, -50%) rotate(45deg);
@@ -695,7 +852,7 @@ button:focus-visible,
    plain square (locked/idle); pass/current/fail override the shape below. */
 .axis__node {
   position: absolute;
-  top: 50%;
+  top: 17px;
   transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
@@ -712,7 +869,10 @@ button:focus-visible,
   transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
+/* Genuinely hollow — an outline only, no fill — so "unattempted" reads
+   distinctly even before checking color. */
 .axis__node--locked {
+  background: transparent;
   opacity: 0.55;
 }
 
@@ -920,9 +1080,10 @@ button:focus-visible,
 /* When showing the per-level breakdown instead of a frame, don't force it
    into a centered blob inside an aspect-ratio box. Let it fill the space
    top-to-bottom instead. */
+/* No forced min-height — the breakdown is six rows plus a header, so it
+   should size to that content instead of leaving empty space below L6. */
 .browser__viewport--summary {
   aspect-ratio: auto;
-  min-height: 300px;
   display: block;
 }
 
@@ -1059,66 +1220,86 @@ button:focus-visible,
   color: var(--fail);
 }
 
+/* Widened deliberately — the failure title should be dramatically larger
+   than the stats beneath it, not sitting in the same narrow size band. */
 .failure-hero-mode {
-  margin: 0;
+  margin: 0 0 12px;
   font-family: var(--display);
-  font-size: 25px;
-  font-weight: 700;
+  font-size: 34px;
+  font-weight: 800;
   color: var(--text-primary);
   text-transform: uppercase;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.005em;
 }
 
-/* The core finding of the project: what the agent believed vs. what
-   actually happened. Deliberately the second-most prominent thing in the
-   card — a full-width block, not a small inline chip, directly under the
-   failure-mode heading. */
-.failure-hero-belief {
-  display: block;
-  margin-bottom: 12px;
-  padding: 10px 14px;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--hairline);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
+/* Instrument readouts, not prose — level / duration / event count / the
+   agent's stated belief, each a labeled value, instead of a single
+   sentence occupying the card's most valuable slot. */
+.failure-hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding-bottom: 12px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--hairline);
 }
 
-.failure-hero-belief strong {
-  color: var(--text-primary);
+.failure-hero-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.failure-hero-stat-label {
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  opacity: 0.8;
+}
+
+.failure-hero-stat-value {
+  font-family: var(--mono);
+  font-size: 15px;
   font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
-.failure-hero-belief[data-mismatch="true"] {
-  border-color: rgba(224, 165, 66, 0.5);
-  background: rgba(224, 165, 66, 0.08);
-}
-
-.failure-hero-belief[data-mismatch="true"] strong {
+.failure-hero-stat--mismatch .failure-hero-stat-value {
   color: var(--accent);
 }
 
 .failure-hero-belief-tag {
   display: inline-block;
-  margin-left: 8px;
-  padding: 2px 8px;
+  margin-left: 6px;
+  padding: 1px 6px;
   border-radius: var(--radius-sm);
   background: var(--accent);
   color: var(--bg-base);
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   vertical-align: middle;
 }
 
-.failure-hero-belief-pending {
+/* Absence of a self-report rendered as a small dim tag — not a sentence
+   filling the card's most valuable slot — so the trace excerpt below reads
+   as the next thing that matters, not an afterthought under a big empty box. */
+.failure-hero-no-report {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 2px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: var(--text-dim);
-  font-size: 12.5px;
-  font-weight: 400;
-  font-style: italic;
 }
 
 .failure-hero-trace {

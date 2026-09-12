@@ -86,7 +86,7 @@ export default function TraceLog({ runs }: Props) {
   }, [visible.length]);
 
   return (
-    <div className="trace panel">
+    <div className="trace panel panel--bracket">
       <div className="trace__head">
         <span>Trace</span>
         <div className="trace__filters">

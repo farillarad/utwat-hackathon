@@ -26,7 +26,7 @@ interface Props {
 
 export default function AgentView({ frame, ended, summary }: Props) {
   return (
-    <figure className="browser panel">
+    <figure className="browser panel panel--bracket">
       <figcaption className="browser__chrome">
         <span className="browser__dots" aria-hidden />
         <span className="browser__url">{frame?.url ?? summary?.runName ?? "—"}</span>
