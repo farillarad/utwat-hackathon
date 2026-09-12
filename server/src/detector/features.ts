@@ -25,7 +25,10 @@ export interface Example {
 }
 
 const MUTATING = new Set(["click", "type"]);
-const ORDERS_PAGE = /(^|\/)orders(\/|\?|$|\b)/i;
+// Page-side: the nav targets the gauntlet's orders pages log (apps/gauntlet/src/orders/*).
+const ORDERS_PAGE_EVENTS = new Set(["orders-list-viewed", "order-detail-viewed"]);
+// Agent-side: a navigate step to an orders URL.
+const ORDERS_URL = /\/orders(\/|\?|#|$)/i;
 
 // Adapters log the `done` step around the verify request, not exactly at it: a rejected
 // claim's prefix ends at the `done` step nearest the verify call within this window, or
@@ -60,10 +63,10 @@ export function extractFeatures(run: RunRecord, cutoff: number): Features {
       e.type === "nav" &&
       e.received_at > lastMutation &&
       e.received_at <= cutoff &&
-      (ORDERS_PAGE.test(e.target ?? "") || ORDERS_PAGE.test(e.value ?? ""))
+      ORDERS_PAGE_EVENTS.has(e.target ?? "")
   );
   const agentVerified = actions.some(
-    (s) => s.ts > lastMutation && (s.action === "read" || (s.action === "navigate" && ORDERS_PAGE.test(s.value ?? "")))
+    (s) => s.ts > lastMutation && (s.action === "read" || (s.action === "navigate" && ORDERS_URL.test(s.value ?? "")))
   );
 
   const seen = new Set<string>();

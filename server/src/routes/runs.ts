@@ -1,5 +1,5 @@
 import { Router, type Request } from "express";
-import type { RunStore } from "../store/runStore";
+import { isManualRunId, type RunStore } from "../store/runStore";
 import { parseClaim, parseOrderPayload, parseStartRun } from "./validation";
 
 // Owner: Farill — run routes (PRD-v2 §8.1).
@@ -32,7 +32,8 @@ export function runsRouter(store: RunStore): Router {
 
   // Posted by the gauntlet page. The level comes from the run, not the URL (§8.1).
   router.post("/:runId/order", (req, res) => {
-    const run = store.getRun(req.params.runId);
+    const pageLevel = typeof req.body?.level_id === "number" ? req.body.level_id : undefined;
+    const run = store.getOrCreateManualRun(req.params.runId, pageLevel);
     if (!run) return res.status(404).json({ error: "unknown run_id" });
     const parsed = parseOrderPayload(req.body, run.level_id);
     if (!parsed.ok) return res.status(400).json({ error: parsed.error });
@@ -42,6 +43,7 @@ export function runsRouter(store: RunStore): Router {
   // "Your orders" — every submission in the run, rejected and cancelled ones included.
   router.get("/:runId/orders", (req, res) => {
     const run = store.getRun(req.params.runId);
+    if (!run && isManualRunId(req.params.runId)) return res.json([]); // a human who hasn't ordered yet
     if (!run) return res.status(404).json({ error: "unknown run_id" });
     res.json(run.orders);
   });

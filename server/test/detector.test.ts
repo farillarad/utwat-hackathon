@@ -50,15 +50,29 @@ describe("extractFeatures", () => {
   test("a page-side visit to /orders after the last mutation counts", () => {
     const r = run({
       trajectory: [s("click", 2000, "submit"), s("done", 5000)],
-      page_events: [{ run_id: "r", level: 1, ts: 1, type: "nav", target: "/orders", received_at: 3000 }],
+      page_events: [{ run_id: "r", level: 1, ts: 1, type: "nav", target: "orders-list-viewed", value: "1", received_at: 3000 }],
     });
     assert.equal(extractFeatures(r, 5000).verified_after_last_mutation, 1);
+  });
+
+  test("the order detail page counts; the decoy and fake confirmation don't", () => {
+    const f = (target: string) =>
+      extractFeatures(
+        run({
+          trajectory: [s("click", 2000, "submit"), s("done", 5000)],
+          page_events: [{ run_id: "r", level: 1, ts: 1, type: "nav", target, received_at: 3000 }],
+        }),
+        5000
+      ).verified_after_last_mutation;
+    assert.equal(f("order-detail-viewed"), 1);
+    assert.equal(f("decoy-link"), 0);
+    assert.equal(f("fake-confirmation-viewed"), 0);
   });
 
   test("a visit before the last mutation doesn't count", () => {
     const r = run({
       trajectory: [s("click", 4000, "submit"), s("done", 5000)],
-      page_events: [{ run_id: "r", level: 1, ts: 1, type: "nav", target: "/orders/ORD-1", received_at: 3000 }],
+      page_events: [{ run_id: "r", level: 1, ts: 1, type: "nav", target: "order-detail-viewed", received_at: 3000 }],
     });
     assert.equal(extractFeatures(r, 5000).verified_after_last_mutation, 0);
   });

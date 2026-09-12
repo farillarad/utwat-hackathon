@@ -65,7 +65,7 @@ export function syntheticRuns(seed = 1, trials = 3): RunRecord[] {
           const page_events: RunRecord["page_events"] = [];
           if (verifies) {
             step("navigate", undefined, "/orders");
-            page_events.push({ run_id: "", level: level.id, ts: 0, type: "nav", target: "/orders", received_at: t + 800 });
+            page_events.push({ run_id: "", level: level.id, ts: 0, type: "nav", target: "orders-list-viewed", received_at: t + 800 });
           }
           const succeeded = rand() < (verifies ? 0.85 : 0.35);
           const claims = succeeded ? rand() < 0.9 : rand() < (verifies ? 0.2 : 0.85);

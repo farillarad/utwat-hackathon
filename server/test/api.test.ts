@@ -244,6 +244,32 @@ describe("page events", () => {
   });
 });
 
+describe("manual runs (a human opening a level without ?run_id=)", () => {
+  test("created on the page's first event, then orders land on them", async () => {
+    const run_id = `manual-${Math.random().toString(36).slice(2, 8)}`;
+    assert.deepEqual((await get(`/api/runs/${run_id}/orders`)).body, []); // before anything happens
+    assert.equal((await post("/api/events", { run_id, level: 3, ts: 1, type: "level_start" })).status, 202);
+    const run = (await get(`/api/runs/${run_id}`)).body;
+    assert.equal(run.agent_name, "manual");
+    assert.equal(run.level_id, 3);
+    assert.equal((await post(`/api/runs/${run_id}/order`, correctPayload(3))).body.accepted, true);
+  });
+
+  test("created on first order when no event arrived first", async () => {
+    const res = await post("/api/runs/manual-abc123/order", correctPayload(9));
+    assert.equal(res.body.accepted, true);
+    assert.equal((await get("/api/runs/manual-abc123")).body.level_id, 9);
+  });
+
+  test("not created without a valid level, or for ids outside the pattern", async () => {
+    assert.equal((await post("/api/events", { run_id: "manual-orders", level: 0, ts: 1, type: "nav" })).status, 404);
+    assert.equal((await post("/api/runs/manual-x/order", { ...correctPayload(1), level_id: 99 })).status, 404);
+    assert.equal((await post("/api/runs/someone-else/order", correctPayload(1))).status, 404);
+    assert.equal((await post(`/api/runs/${encodeURIComponent("manual-../../evil")}/order`, correctPayload(1))).status, 404);
+    assert.equal((await get("/api/runs/someone-else/orders")).status, 404);
+  });
+});
+
 describe("GET /api/results", () => {
   test("returns every run", async () => {
     const run_id = await startRun();

@@ -53,11 +53,11 @@ export class RunStore {
 
   // --- runs --------------------------------------------------------------------
 
-  createRun(body: Required<StartRunBody>): RunRecord {
+  createRun(body: Required<StartRunBody>, run_id = nanoid(12)): RunRecord {
     const level = getLevel(body.level_id);
     if (!level) throw new Error(`unknown level ${body.level_id}`);
     const run: RunRecord = {
-      run_id: nanoid(12),
+      run_id,
       agent_name: body.agent_name,
       model: body.model,
       level_id: level.id,
@@ -88,6 +88,16 @@ export class RunStore {
 
   getRun(run_id: string): RunRecord | undefined {
     return this.runs.get(run_id);
+  }
+
+  // A human opening a level without ?run_id= gets a page-generated manual-xxxxxx id
+  // (apps/gauntlet/src/run.ts). Those runs are created on first contact so manual
+  // testing (T3) and the human baseline (§10) record real orders. The id becomes a
+  // filename, so it must match a strict pattern.
+  getOrCreateManualRun(run_id: string, level_id: number | undefined): RunRecord | undefined {
+    const existing = this.runs.get(run_id);
+    if (existing || !isManualRunId(run_id) || level_id === undefined || !getLevel(level_id)) return existing;
+    return this.createRun({ agent_name: "manual", level_id, model: "", trial: 1, wrapper_enabled: false }, run_id);
   }
 
   listRuns(): RunRecord[] {
@@ -195,7 +205,7 @@ export class RunStore {
 
   // Returns false for a run_id the server doesn't know (e.g. a page opened without ?run_id=).
   recordEvent(event: GauntletEvent): boolean {
-    const run = this.runs.get(event.run_id);
+    const run = this.getOrCreateManualRun(event.run_id, event.level);
     if (!run) return false;
     run.page_events.push({ ...event, received_at: Date.now() });
     this.save(run);
@@ -209,3 +219,5 @@ export class RunStore {
     return id;
   }
 }
+
+export const isManualRunId = (run_id: string) => /^manual-[A-Za-z0-9_-]{1,40}$/.test(run_id);
