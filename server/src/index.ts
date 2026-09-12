@@ -2,6 +2,9 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { createServer } from "node:http";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import eventsRouter, { isGauntletEvent } from "./routes/events";
 import runsRouter from "./routes/runs";
 import { broadcast, recordEvent } from "./store/runStore";
@@ -12,6 +15,20 @@ app.use(cors());
 app.use(express.json({ limit: "5mb" })); // frames are base64 JPEGs
 app.use("/api/events", eventsRouter);
 app.use("/api/runs", runsRouter);
+
+// One process, one public URL (PRD v2 §7): serve the built gauntlet from here so a
+// tunnel exposes pages + API + events WS on a single origin that Steel can reach.
+// Build it with `npm run build -w apps/gauntlet`; under Vite dev this is skipped.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const GAUNTLET_DIST = process.env.GAUNTLET_DIST ?? path.resolve(__dirname, "../../apps/gauntlet/dist");
+if (existsSync(GAUNTLET_DIST)) {
+  app.use(express.static(GAUNTLET_DIST));
+  app.get(/^\/(level|orders)(\/.*)?$/, (_req, res) => res.sendFile(path.join(GAUNTLET_DIST, "index.html")));
+  app.get("/", (_req, res) => res.sendFile(path.join(GAUNTLET_DIST, "index.html")));
+  console.log(`serving gauntlet from ${GAUNTLET_DIST}`);
+} else {
+  console.log("gauntlet not built (apps/gauntlet/dist missing) — API only");
+}
 
 const server = createServer(app);
 
