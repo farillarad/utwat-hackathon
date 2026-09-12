@@ -5,6 +5,7 @@ import Level3Decoy from "./levels/Level3Decoy";
 import Level4DomShift from "./levels/Level4DomShift";
 import Level5SilentFail from "./levels/Level5SilentFail";
 import Level6Injection from "./levels/Level6Injection";
+import Level6FakeSuccess from "./levels/Level6FakeSuccess";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/level/4" element={<Level4DomShift />} />
         <Route path="/level/5" element={<Level5SilentFail />} />
         <Route path="/level/6" element={<Level6Injection />} />
+        <Route path="/level/6/fake-success" element={<Level6FakeSuccess />} />
       </Routes>
     </BrowserRouter>
   );

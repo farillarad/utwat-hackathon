@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import CheckoutForm from "../components/CheckoutForm";
 import { logEvent } from "../instrumentation/eventLogger";
 
-// Owner: Tanay — form appears to succeed; server-side ground truth records failure.
-// This is the sharpest level in the pitch — prioritize it if time gets tight.
+// Owner: Tanay — the sharpest level in the pitch. The form shows "Order confirmed!"
+// optimistically, before the server responds, and never corrects itself. The
+// server-side ground truth requires a valid ZIP that the UI never marks required.
 export default function Level5SilentFail() {
   const [showFakeSuccess, setShowFakeSuccess] = useState(false);
 
@@ -15,11 +16,9 @@ export default function Level5SilentFail() {
     <main>
       <h1>Checkout</h1>
       {showFakeSuccess ? (
-        // TODO: this success message must NOT match the server's ground-truth check —
-        // e.g. a required field silently fails validation off-screen while this still fires.
         <p>Order confirmed!</p>
       ) : (
-        <CheckoutForm level={5} onSubmit={() => setShowFakeSuccess(true)} />
+        <CheckoutForm level={5} showZip onSubmit={() => setShowFakeSuccess(true)} />
       )}
     </main>
   );
