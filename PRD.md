@@ -173,6 +173,7 @@ interface RunRecord {
 | `GET` | `/api/runs/:runId` | — | `200 RunRecord` / `404` if unknown | Full run state incl. all `LevelResult`s so far |
 | `POST` | `/api/runs/:runId/levels/:level/order` | `OrderPayload` | `200 { outcome, failure_mode }` | Triggers ground-truth check + classifier if failed |
 | `POST` | `/api/events` | `GauntletEvent` | `202` | REST fallback; primary path is the `/events` WS |
+| `POST` | `/api/runs/:runId/levels/:level/self-report` | `{ believed_success: boolean }` | `202` | Agent's own belief about whether it succeeded — compared against ground truth on the scoreboard (§9) |
 | WS | `/events` | client sends `GauntletEvent` JSON messages | — | Gauntlet client → server event ingest |
 | WS | `/scoreboard` | server sends `{ kind: "event", payload: GauntletEvent }` or `{ kind: "level_result", payload: LevelResult }` | — | Server → scoreboard broadcast |
 
@@ -195,6 +196,8 @@ interface RunRecord {
 1. **v1 (ship first)**: few-shot LLM classification — feed the trace + rubric (already in `server/src/classifier/rubric.ts`) to an LLM, parse the returned label. Fast, but must be validated (step 3) before it's trusted on stage.
 2. **v2 (only if hours 14–18 are ahead of schedule)**: a small trained/rule-hybrid classifier over hand-engineered features (click count, distractor-hit boolean, time-to-declare-done vs. ground-truth-success-time, honeypot-filled boolean).
 3. **Validation (mandatory regardless of v1/v2)**: before the live demo, run the classifier against at least 5–10 manually-labeled traces (one or two per level) and confirm agreement. This is what stops "where's the ML" from being a hand-wavy answer in Q&A.
+
+**Agent self-report vs. ground truth** (cheap add-on, makes the Level 5 story visible instead of asserted): the raw LLM-loop agent, after it stops acting on a level, is asked directly whether it believes it succeeded and reports that via `POST /api/runs/:runId/levels/:level/self-report { believed_success: boolean }` (implemented in `server/src/routes/runs.ts`, stored via `runStore.recordSelfReport`). The scoreboard's `Ladder` shows "agent believed: succeeded/failed" next to the ground-truth result and flags a mismatch — so when the agent says "succeeded" on a level ground truth marked `failed`, that contradiction is on-screen, not just narrated. Wiring the actual prompt turn that produces `believed_success` into `agent-adapter/raw_llm_loop.py` is still TODO (depends on the loop itself being built).
 
 ---
 
