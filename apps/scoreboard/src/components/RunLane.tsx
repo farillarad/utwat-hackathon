@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import AgentView from "./AgentView";
-import Ladder from "./Ladder";
+import TransitLine from "./TransitLine";
+import FailureHero from "./FailureHero";
 import TraceLog from "./TraceLog";
-import { ladderScore, type RunState } from "../ws/useRunStream";
+import { ladderScore, LADDER_LEVELS, type RunState } from "../ws/useRunStream";
+
+const MAX_SCORE = LADDER_LEVELS.length * 10;
 
 interface Props {
   run: RunState;
@@ -44,6 +47,9 @@ export default function RunLane({ run, onDismiss }: Props) {
   const { score, highest, penalty } = ladderScore(run.levels);
   const shownScore = useCountUp(score);
   const failed = run.levels.find((l) => l.outcome === "failed" && l.level > highest);
+  const passCount = run.levels.filter((l) => l.outcome === "completed").length;
+  const failCount = run.levels.filter((l) => l.outcome === "failed").length;
+  const totalDuration = run.levels.reduce((sum, l) => sum + (l.duration_s ?? 0), 0);
 
   return (
     <section className={`lane ${run.ended ? "lane--ended" : ""}`} aria-label={`Run for ${run.agent_name}`}>
@@ -51,10 +57,27 @@ export default function RunLane({ run, onDismiss }: Props) {
         <div>
           <span className="lane__eyebrow">{run.ended ? "Run finished" : "Running"}</span>
           <h2 className="lane__agent">{run.agent_name}</h2>
+          <div className="lane__stats">
+            <span>
+              <strong>{passCount}</strong> passed
+            </span>
+            <span className="lane__stats-fail">
+              <strong>{failCount}</strong> failed
+            </span>
+            <span>
+              <strong>{run.levels.length}</strong>/{LADDER_LEVELS.length} attempted
+            </span>
+            <span>
+              <strong>{totalDuration.toFixed(1)}s</strong> total
+            </span>
+          </div>
         </div>
         <div className="score">
           <span className="score__label">Ladder score</span>
-          <span className="score__value">{shownScore}</span>
+          <span className="score__value">
+            {shownScore}
+            <span className="score__max">/{MAX_SCORE}</span>
+          </span>
           <span className="score__detail">
             {highest > 0 ? `L${highest} × 10` : "no level passed"}
             {penalty > 0 && ` − ${penalty} retr${penalty === 1 ? "y" : "ies"}`}
@@ -68,20 +91,10 @@ export default function RunLane({ run, onDismiss }: Props) {
       <div className="lane__body">
         <div className="lane__left">
           <AgentView frame={run.frame} ended={run.ended} />
-          {failed && (
-            <p className="lane__verdict">
-              Broke on level {failed.level}
-              {failed.failure_mode && (
-                <>
-                  {" — "}
-                  <span className={`tag tag--${failed.failure_mode}`}>{label(failed.failure_mode)}</span>
-                </>
-              )}
-            </p>
-          )}
+          {failed && <FailureHero result={failed} events={run.events} />}
         </div>
         <div className="lane__right">
-          <Ladder levels={run.levels} currentLevel={run.ended ? null : run.current_level} />
+          <TransitLine levels={run.levels} currentLevel={run.ended ? null : run.current_level} />
           <TraceLog events={run.events} />
         </div>
       </div>

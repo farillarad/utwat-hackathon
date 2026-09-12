@@ -33,12 +33,15 @@ export default function App() {
 
       {visible.length === 0 ? (
         <section className="empty">
-          <p className="empty__lead">Waiting for an agent to start a run.</p>
-          <p className="empty__hint">
-            Point an adapter at the gauntlet: <code>python agent-adapter/raw_llm_loop.py</code> or{" "}
-            <code>python agent-adapter/browser_use_runner.py</code>. To replay a stored run:{" "}
-            <code>npx tsx scripts/replay-run.ts data/runs/&lt;file&gt;.json</code>
-          </p>
+          <div className="empty__panel">
+            <span className="empty__status">Standing by</span>
+            <p className="empty__lead">Waiting for an agent to start a run.</p>
+            <p className="empty__hint">
+              Point an adapter at the gauntlet: <code>python agent-adapter/raw_llm_loop.py</code> or{" "}
+              <code>python agent-adapter/browser_use_runner.py</code>. To replay a stored run:{" "}
+              <code>npx tsx scripts/replay-run.ts data/runs/&lt;file&gt;.json</code>
+            </p>
+          </div>
         </section>
       ) : (
         <main className="lanes" data-lanes={visible.length}>
