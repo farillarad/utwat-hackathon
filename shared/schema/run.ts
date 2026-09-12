@@ -7,6 +7,11 @@ export const FAILURE_MODES = [
 
 export type FailureMode = (typeof FAILURE_MODES)[number];
 
+// run_id the gauntlet's eventLogger falls back to when the page has no ?run_id=
+// (i.e. a human clicking through for acceptance testing). The server auto-creates
+// this run so manual tests still produce real ground-truth results.
+export const MANUAL_RUN_ID = "manual-test-run";
+
 // OrderPayload lives in ./order; re-exported here so either import path works.
 export type { OrderPayload } from "./order";
 

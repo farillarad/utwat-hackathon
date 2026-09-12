@@ -13,9 +13,33 @@ import {
 } from "../store/runStore";
 import { checkGroundTruth } from "../groundTruth/levelChecks";
 import { classifyOutcome } from "../classifier/classify";
-import type { LevelResult, OrderPayload } from "../../../shared/schema/run";
+import { MANUAL_RUN_ID, type LevelResult, type OrderPayload } from "../../../shared/schema/run";
 
 const router = Router();
+
+// Every run must be created via /start — except the gauntlet's no-?run_id fallback,
+// which is auto-created so a human clicking through still records ground truth.
+function resolveRun(runId: string) {
+  return getRun(runId) ?? (runId === MANUAL_RUN_ID ? createRun(runId, "manual", "") : undefined);
+}
+
+// Ground truth -> classifier -> stored LevelResult -> scoreboard. Called when an
+// order lands, and also when an agent self-reports on a level it never ordered on
+// (L6 fake-success shortcut, L4 give-up) so those still produce a result.
+export async function evaluateLevel(runId: string, level: number): Promise<LevelResult> {
+  const outcome = checkGroundTruth(runId, level);
+  const result: LevelResult = {
+    level,
+    outcome,
+    failure_mode: outcome === "completed" ? null : await classifyOutcome(runId, level),
+    duration_s: getLevelDurationSeconds(runId, level),
+    retries: Math.max(0, getAttemptCount(runId, level) - 1),
+    agent_self_report: getSelfReport(runId, level) ?? null,
+  };
+  recordLevelResult(runId, result);
+  broadcastToScoreboard({ kind: "level_result", run_id: runId, payload: result });
+  return result;
+}
 
 router.post("/start", (req, res) => {
   const { agent_name, start_url } = req.body ?? {};
@@ -46,43 +70,36 @@ router.post("/:runId/levels/:level/order", async (req, res) => {
   const { runId } = req.params;
   const level = Number(req.params.level);
   if (!Number.isInteger(level)) return res.sendStatus(400);
-  if (!getRun(runId)) return res.sendStatus(404);
+  if (!resolveRun(runId)) return res.sendStatus(404);
   if (!isValidOrderPayload(req.body)) {
     return res.status(400).json({ error: "malformed order payload" });
   }
 
   recordOrder(runId, level, req.body);
-  const outcome = checkGroundTruth(runId, level);
-  const failureMode = outcome === "completed" ? null : await classifyOutcome(runId, level);
-
-  const result: LevelResult = {
-    level,
-    outcome,
-    failure_mode: failureMode,
-    duration_s: getLevelDurationSeconds(runId, level),
-    retries: Math.max(0, getAttemptCount(runId, level) - 1),
-    agent_self_report: getSelfReport(runId, level) ?? null,
-  };
-  recordLevelResult(runId, result);
-  broadcastToScoreboard({ kind: "level_result", run_id: runId, payload: result });
-
-  res.json({ outcome, failure_mode: failureMode });
+  const { outcome, failure_mode } = await evaluateLevel(runId, level);
+  res.json({ outcome, failure_mode });
 });
 
 // The agent's own claim about whether it succeeded, reported independently of
 // the order submission (usually after it, once the agent has "finished" the
 // level). Comparing this to the ground-truth outcome above is what makes an
 // agent's false confidence visible on the scoreboard, not just asserted in the pitch.
-router.post("/:runId/levels/:level/self-report", (req, res) => {
+//
+// If the agent reports on a level it never placed an order on, the level is
+// evaluated now (ground truth: failed, since no order exists) — otherwise a hijacked
+// or given-up level would never appear on the ladder at all.
+router.post("/:runId/levels/:level/self-report", async (req, res) => {
   const { runId } = req.params;
   const level = Number(req.params.level);
   if (!Number.isInteger(level)) return res.sendStatus(400);
-  if (!getRun(runId)) return res.sendStatus(404);
+  const run = resolveRun(runId);
+  if (!run) return res.sendStatus(404);
   const believedSuccess = req.body?.believed_success;
   if (typeof believedSuccess !== "boolean") {
     return res.status(400).json({ error: "believed_success must be a boolean" });
   }
   recordSelfReport(runId, level, believedSuccess);
+  if (!run.levels.some((l) => l.level === level)) await evaluateLevel(runId, level);
   res.sendStatus(202);
 });
 
