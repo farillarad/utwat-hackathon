@@ -1,4 +1,6 @@
 import type { FramePayload } from "@shared/schema/scoreboard";
+import type { LevelResult } from "@shared/schema/run";
+import { LADDER_LEVELS } from "../ws/useRunStream";
 
 // Live browser view. The adapter that owns the browser pushes ~1 fps JPEG frames to
 // POST /api/runs/:id/frame; the server relays them here. This works for any agent
@@ -7,15 +9,13 @@ import type { FramePayload } from "@shared/schema/scoreboard";
 //
 // There is exactly one of these on the board now, tied to whichever run is
 // selected (see ComparisonBoard) — not one per run. When that run has no frame
-// yet, `summary` renders its stats instead of a bare "waiting" placeholder.
+// yet, `summary` renders its per-level timing breakdown instead of leaving a
+// bare "waiting" placeholder sitting in a tall empty box.
 export interface AgentSummary {
-  agentName: string;
-  passCount: number;
-  failCount: number;
-  attempted: number;
-  totalLevels: number;
+  runName: string;
   score: number;
   maxScore: number;
+  levels: LevelResult[];
   ended: boolean;
 }
 
@@ -30,30 +30,37 @@ export default function AgentView({ frame, ended, summary }: Props) {
     <figure className="browser">
       <figcaption className="browser__chrome">
         <span className="browser__dots" aria-hidden />
-        <span className="browser__url">{frame?.url ?? summary?.agentName ?? "—"}</span>
+        <span className="browser__url">{frame?.url ?? summary?.runName ?? "—"}</span>
         {frame && !ended && <span className="browser__live">live</span>}
       </figcaption>
-      <div className="browser__viewport">
+      <div className={`browser__viewport${!frame && summary ? " browser__viewport--summary" : ""}`}>
         {frame ? (
           <img src={`data:image/jpeg;base64,${frame.image}`} alt="Agent's browser" />
         ) : summary ? (
           <div className="browser__summary">
-            <span className="browser__summary-status">{summary.ended ? "Run finished" : "No frame yet"}</span>
-            <span className="browser__summary-score">
-              {summary.score}
-              <span className="browser__summary-max">/{summary.maxScore}</span>
-            </span>
-            <div className="browser__summary-stats">
-              <span>
-                <strong>{summary.passCount}</strong> passed
-              </span>
-              <span>
-                <strong>{summary.failCount}</strong> failed
-              </span>
-              <span>
-                {summary.attempted}/{summary.totalLevels} attempted
+            <div className="browser__summary-head">
+              <span className="browser__summary-status">{summary.ended ? "Run finished" : "No frame yet"}</span>
+              <span className="browser__summary-score">
+                {summary.score}
+                <span className="browser__summary-max">/{summary.maxScore}</span>
               </span>
             </div>
+            <ol className="browser__breakdown">
+              {LADDER_LEVELS.map((level) => {
+                const result = summary.levels.find((l) => l.level === level);
+                return (
+                  <li key={level} className={`browser__breakdown-row browser__breakdown-row--${result?.outcome ?? "pending"}`}>
+                    <span className="browser__breakdown-level">L{level}</span>
+                    <span className="browser__breakdown-time">
+                      {result?.duration_s ? `${result.duration_s.toFixed(1)}s` : "—"}
+                    </span>
+                    <span className="browser__breakdown-outcome">
+                      {result ? (result.outcome === "completed" ? "✓ completed" : "✕ failed") : "not attempted"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
           </div>
         ) : (
           <p className="browser__empty">

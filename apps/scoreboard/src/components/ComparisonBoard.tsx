@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import AgentView from "./AgentView";
-import ComparativeScore from "./ComparativeScore";
 import LadderAxis from "./LadderAxis";
 import FailureHero from "./FailureHero";
 import TraceLog from "./TraceLog";
 import { ladderScore, LADDER_LEVELS, type RunState } from "../ws/useRunStream";
+import { runLabel } from "../lib/runLabel";
 
 const MAX_SCORE = LADDER_LEVELS.length * 10;
 
@@ -50,24 +50,22 @@ export default function ComparisonBoard({ runs, onDismiss }: Props) {
 
   const summary = selectedRun
     ? {
-        agentName: selectedRun.agent_name,
-        passCount: selectedRun.levels.filter((l) => l.outcome === "completed").length,
-        failCount: selectedRun.levels.filter((l) => l.outcome === "failed").length,
-        attempted: selectedRun.levels.length,
-        totalLevels: LADDER_LEVELS.length,
+        runName: runLabel(selectedRun, runs),
         score: ladderScore(selectedRun.levels).score,
         maxScore: MAX_SCORE,
+        levels: selectedRun.levels,
         ended: selectedRun.ended,
       }
     : null;
 
   return (
     <div className="comparison">
-      <ComparativeScore runs={runs} selectedRunId={selectedRunId} onSelect={setManualSelection} />
       <LadderAxis runs={runs} selectedRunId={selectedRunId} onSelect={setManualSelection} onDismiss={onDismiss} />
       <div className="comparison__detail">
         <AgentView frame={selectedRun?.frame ?? null} ended={selectedRun?.ended ?? false} summary={summary} />
-        {selectedRun && selectedFailure && <FailureHero result={selectedFailure} events={selectedRun.events} />}
+        {selectedRun && selectedFailure && (
+          <FailureHero result={selectedFailure} events={selectedRun.events} runName={runLabel(selectedRun, runs)} />
+        )}
       </div>
       <TraceLog runs={runs} />
     </div>

@@ -13,6 +13,7 @@
   --muted: #8a95a5;
   --pass: #7fa08f;
   --fail: #ff3b30;
+  --fail-dim: #7a4642;
   --live: #ffc65c;
   --pending: #3a4452;
 
@@ -248,91 +249,6 @@ button:focus-visible,
   overflow-y: auto;
 }
 
-/* ---- Comparative score ------------------------------------------------ */
-
-.cscore {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.cscore__row {
-  flex: 1 1 220px;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-rows: auto auto auto;
-  column-gap: 14px;
-  row-gap: 2px;
-  align-items: baseline;
-  text-align: left;
-  color: inherit;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 12px 16px;
-  cursor: pointer;
-}
-
-.cscore__row:hover {
-  border-color: var(--muted);
-}
-
-.cscore__row--selected {
-  border-color: var(--live);
-  box-shadow: 0 0 0 1px rgba(255, 198, 92, 0.25);
-}
-
-.cscore__name {
-  grid-column: 1;
-  grid-row: 1;
-  font-family: var(--display);
-  font-size: 18px;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cscore__value {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  align-self: center;
-  font-family: var(--display);
-  font-weight: 700;
-  font-size: 34px;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.cscore__max {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--muted);
-}
-
-.cscore__detail {
-  grid-column: 1;
-  grid-row: 2;
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.cscore__delta {
-  grid-column: 1 / -1;
-  grid-row: 3;
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--fail);
-  margin-top: 2px;
-}
-
-.cscore__delta--lead {
-  color: var(--live);
-  font-weight: 700;
-}
-
 /* ---- Shared ladder axis ------------------------------------------------
    Levels 1-6 are fixed, equal-width columns spanning the full width; every
    run is a row plotted against that same axis, so a run dying at L5 and one
@@ -350,7 +266,7 @@ button:focus-visible,
 
 .axis__header {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 200px 74px 1fr;
   gap: 16px;
   padding-bottom: 8px;
   margin-bottom: 4px;
@@ -374,13 +290,15 @@ button:focus-visible,
 
 .axis__row {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 200px 74px 1fr;
   gap: 16px;
   align-items: center;
-  padding: 8px 8px;
+  padding: 8px 8px 8px 12px;
   margin: 0 -8px;
   border-radius: 8px;
+  border-left: 3px solid transparent;
   cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .axis__row:not(:last-child) {
@@ -391,12 +309,15 @@ button:focus-visible,
   background: rgba(255, 255, 255, 0.02);
 }
 
+/* Selection needs to be unambiguous at a glance: accent border + tinted
+   background on the row, not just a subtle tone shift. */
 .axis__row--selected {
-  background: rgba(255, 198, 92, 0.07);
+  background: rgba(255, 198, 92, 0.08);
+  border-left-color: var(--live);
 }
 
 .axis__row--selected:hover {
-  background: rgba(255, 198, 92, 0.1);
+  background: rgba(255, 198, 92, 0.11);
 }
 
 .axis__runner {
@@ -420,6 +341,12 @@ button:focus-visible,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.axis__leader {
+  color: var(--live);
+  margin-right: 4px;
+  font-size: 15px;
 }
 
 .axis__dismiss {
@@ -457,6 +384,33 @@ button:focus-visible,
   color: var(--fail);
 }
 
+/* Per-row score — replaces the old separate top score strip. */
+.axis__score {
+  display: grid;
+  justify-items: end;
+  text-align: right;
+}
+
+.axis__score-value {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.axis__score-max {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.axis__score-detail {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
 .axis__track {
   position: relative;
   height: 34px;
@@ -482,17 +436,54 @@ button:focus-visible,
   transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Flat and desaturated by default — only the selected run's severance
+   marker (below) gets full saturation and the glow. Unselected failures are
+   still visible, just not competing for attention. */
 .axis__break {
   position: absolute;
   top: 50%;
+  width: 9px;
+  height: 9px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  border-right: 2px solid var(--fail-dim);
+  border-bottom: 2px solid var(--fail-dim);
+  cursor: pointer;
+  transition: left 0.6s cubic-bezier(0.22, 1, 0.36, 1), width 0.3s ease, height 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.axis__break--selected {
   width: 13px;
   height: 13px;
-  transform: translate(-50%, -50%) rotate(45deg);
-  border-right: 2px solid var(--fail);
-  border-bottom: 2px solid var(--fail);
-  cursor: pointer;
-  transition: left 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  border-right-color: var(--fail);
+  border-bottom-color: var(--fail);
   animation: axis-break-pulse 1.6s ease-in-out infinite;
+}
+
+/* Ended without failing but never reached the last level — distinct from
+   both a live run's dashed "hasn't gotten there yet" and the diamond
+   severance marker used for an actual failure. */
+.axis__endcap {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: 18px;
+  background: var(--muted);
+  border-radius: 2px;
+}
+
+.axis__endcap-label {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 @keyframes axis-break-pulse {
@@ -541,6 +532,7 @@ button:focus-visible,
   background: rgba(127, 160, 143, 0.14);
 }
 
+/* Full saturation + glow: only the selected run's failure looks like this. */
 .axis__node--fail {
   width: 30px;
   height: 30px;
@@ -549,6 +541,14 @@ button:focus-visible,
   background: var(--fail);
   color: #1a0906;
   box-shadow: 0 0 0 6px rgba(255, 59, 48, 0.15), 0 0 20px rgba(255, 59, 48, 0.55);
+}
+
+/* Flat and desaturated: every other run's failure, so exactly one marker on
+   the board reads as "the finding," not all of them at once. */
+.axis__node--fail-dim {
+  border-color: var(--fail-dim);
+  color: var(--fail-dim);
+  background: rgba(122, 70, 66, 0.14);
 }
 
 /* ---- Selection detail row: video feed | failure hero ------------------- */
@@ -612,6 +612,16 @@ button:focus-visible,
   place-items: center;
 }
 
+/* When showing the per-level breakdown instead of a frame, don't force it
+   into a centered blob inside an aspect-ratio box — that's what made this
+   panel read as a tall empty box in the first place. Let it fill the space
+   top-to-bottom instead. */
+.browser__viewport--summary {
+  aspect-ratio: auto;
+  min-height: 300px;
+  display: block;
+}
+
 .browser__viewport img {
   width: 100%;
   height: 100%;
@@ -627,11 +637,19 @@ button:focus-visible,
 }
 
 .browser__summary {
-  display: grid;
-  gap: 10px;
-  justify-items: center;
-  text-align: center;
-  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  padding: 16px 20px;
+}
+
+.browser__summary-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
 }
 
 .browser__summary-status {
@@ -645,29 +663,55 @@ button:focus-visible,
 .browser__summary-score {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 40px;
+  font-size: 30px;
   line-height: 1;
   color: var(--live);
 }
 
 .browser__summary-max {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--muted);
 }
 
-.browser__summary-stats {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 14px;
+/* Per-level timing breakdown — fills the space a bare "waiting" placeholder
+   used to leave empty, and doubles as a quick per-level readout for the
+   selected run even once a frame is available for other runs. */
+.browser__breakdown {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.browser__breakdown-row {
+  display: grid;
+  grid-template-columns: 34px 56px 1fr;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 4px;
   font-family: var(--mono);
   font-size: 12px;
   color: var(--muted);
 }
 
-.browser__summary-stats strong {
+.browser__breakdown-row:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.browser__breakdown-level {
   color: var(--text);
+  font-weight: 700;
+}
+
+.browser__breakdown-row--completed .browser__breakdown-outcome {
+  color: var(--pass);
+}
+
+.browser__breakdown-row--failed .browser__breakdown-outcome {
+  color: var(--fail);
+  font-weight: 700;
 }
 
 /* ---- Failure hero ------------------------------------------------------
@@ -707,28 +751,56 @@ button:focus-visible,
   text-transform: uppercase;
 }
 
+/* The core finding of the project: what the agent believed vs. what
+   actually happened. Deliberately the second-most prominent thing in the
+   card — a full-width block, not a small inline chip, directly under the
+   failure-mode heading. */
 .failure-hero-belief {
-  display: inline-block;
-  margin-bottom: 10px;
-  padding: 5px 10px;
-  border-radius: 4px;
+  display: block;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 6px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--line);
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.failure-hero-belief strong {
+  font-size: 15px;
+  font-weight: 500;
   color: var(--text);
 }
 
-.failure-hero-belief-wrong {
-  border-color: rgba(255, 198, 92, 0.5);
+.failure-hero-belief strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+.failure-hero-belief[data-mismatch="true"] {
+  border-color: rgba(255, 198, 92, 0.55);
+  background: rgba(255, 198, 92, 0.08);
+}
+
+.failure-hero-belief[data-mismatch="true"] strong {
   color: var(--live);
 }
 
-.failure-hero-belief-wrong strong {
-  color: var(--live);
+.failure-hero-belief-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--live);
+  color: var(--bg);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  vertical-align: middle;
+}
+
+.failure-hero-belief-pending {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+  font-style: italic;
 }
 
 .failure-hero-trace {
@@ -743,6 +815,11 @@ button:focus-visible,
   color: var(--muted);
   white-space: pre-wrap;
   overflow-x: auto;
+  /* Enough context to fill the card instead of leaving a gap below a short
+     excerpt, capped so a chatty level scrolls internally instead of growing
+     the whole card unbounded. */
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 /* ---- Trace log ------------------------------------------------------
@@ -830,7 +907,7 @@ button:focus-visible,
 
 .trace__row {
   display: grid;
-  grid-template-columns: 96px 30px 66px 1fr;
+  grid-template-columns: 150px 30px 66px 1fr;
   gap: 10px;
   padding: 4px 12px;
   color: var(--text);

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { GauntletEvent } from "@shared/schema/events";
 import type { RunState } from "../ws/useRunStream";
+import { runLabel } from "../lib/runLabel";
 
 function describe(e: GauntletEvent) {
   switch (e.type) {
@@ -49,7 +50,10 @@ export default function TraceLog({ runs }: Props) {
   const visible = filter === "all" ? tagged : tagged.filter((r) => r.run.run_id === filter);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
+    // "nearest" (not "end") so this only scrolls .trace__list itself — with
+    // .comparison now scrollable too (see styles.css), "end" was dragging the
+    // whole board down on every new event, hiding the axis rows above it.
+    endRef.current?.scrollIntoView({ block: "nearest" });
   }, [visible.length]);
 
   return (
@@ -71,7 +75,7 @@ export default function TraceLog({ runs }: Props) {
               }`}
               onClick={() => setFilter(run.run_id)}
             >
-              {run.agent_name}
+              {runLabel(run, runs)}
             </button>
           ))}
         </div>
@@ -81,7 +85,7 @@ export default function TraceLog({ runs }: Props) {
         {visible.length === 0 && <li className="trace__empty">No events yet.</li>}
         {visible.map(({ run, event, sourceClass }, i) => (
           <li key={i} className={`trace__row trace__row--${event.type}`}>
-            <span className={`trace__source ${sourceClass}`}>{run.agent_name}</span>
+            <span className={`trace__source ${sourceClass}`}>{runLabel(run, runs)}</span>
             <span className="trace__level">L{event.level}</span>
             <span className="trace__ts">+{(event.ts / 1000).toFixed(2)}s</span>
             <span className="trace__what">{describe(event)}</span>
