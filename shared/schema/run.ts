@@ -10,6 +10,7 @@ export interface LevelResult {
   outcome: LevelOutcome;
   failure_mode: LevelOutcome | null;
   duration_s: number;
+  retries?: number;
 }
 
 export interface RunRecord {
