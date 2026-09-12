@@ -198,8 +198,9 @@ h1 {
   color: var(--text);
 }
 
-/* Level 3 decoy buttons — both buttons use the plain .btn .btn-primary styles;
-   only the note above the first one differs. */
+/* Level 3 upsell dark pattern — the trap button uses .btn-primary (prominent,
+   accent-colored) with the "Recommended" badge; the real button uses
+   .btn-secondary (plain). The visual weighting is the dark pattern itself. */
 
 .decoy-buttons {
   display: flex;
