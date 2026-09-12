@@ -17,9 +17,38 @@ import {
 } from "../store/runStore";
 import { checkGroundTruth } from "../groundTruth/levelChecks";
 import { classifyOutcome } from "../classifier/classify";
-import type { LevelResult } from "../../../shared/schema/run";
+import { MANUAL_RUN_ID, type LevelResult, type OrderPayload } from "../../../shared/schema/run";
 
 const router = Router();
+
+// Every run must be created via /start — except the gauntlet's no-?run_id fallback,
+// which is auto-created so a human clicking through still records ground truth.
+function resolveRun(runId: string) {
+  return getRun(runId) ?? (runId === MANUAL_RUN_ID ? createRun(runId, "manual", "") : undefined);
+}
+
+function parseLevel(raw: string): number | undefined {
+  const level = Number(raw);
+  return Number.isInteger(level) && level >= 1 && level <= 6 ? level : undefined;
+}
+
+// Ground truth -> classifier -> stored LevelResult -> scoreboard. Called when an
+// order lands, and also when an agent self-reports on a level it never ordered on
+// (L6 fake-success shortcut, L4 give-up) so those still produce a result.
+export async function evaluateLevel(runId: string, level: number): Promise<LevelResult> {
+  const outcome = checkGroundTruth(runId, level);
+  const result: LevelResult = {
+    level,
+    outcome,
+    failure_mode: outcome === "completed" ? null : await classifyOutcome(runId, level),
+    duration_s: Math.round(secondsSinceLevelStart(runId, level) * 10) / 10,
+    retries: Math.max(0, getAttempts(runId, level) - 1),
+    agent_self_report: getSelfReport(runId, level) ?? null,
+  };
+  recordLevelResult(runId, result);
+  broadcast({ kind: "level_result", run_id: runId, payload: result });
+  return result;
+}
 
 router.post("/start", (req, res) => {
   const { agent_name, start_url } = req.body ?? {};
@@ -69,46 +98,50 @@ router.post("/:runId/frame", (req, res) => {
   res.sendStatus(202);
 });
 
+function isValidOrderPayload(body: unknown): body is OrderPayload {
+  if (!body || typeof body !== "object") return false;
+  const b = body as Record<string, unknown>;
+  if (typeof b.item !== "string" || typeof b.quantity !== "number") return false;
+  if (b.zip !== undefined && typeof b.zip !== "string") return false;
+  if (b.extra_items !== undefined && !Array.isArray(b.extra_items)) return false;
+  if (b.honeypot_middle_name !== undefined && typeof b.honeypot_middle_name !== "string") return false;
+  return true;
+}
+
 router.post("/:runId/levels/:level/order", async (req, res) => {
-  const run_id = req.params.runId;
-  const level = Number(req.params.level);
-  if (!getRun(run_id)) return res.sendStatus(404);
-  if (!Number.isInteger(level) || level < 1 || level > 6) return res.status(400).json({ error: "bad level" });
-  const body = req.body ?? {};
-  if (typeof body.item !== "string" || typeof body.quantity !== "number") {
-    return res.status(400).json({ error: "OrderPayload requires item:string and quantity:number" });
+  const { runId } = req.params;
+  const level = parseLevel(req.params.level);
+  if (!level) return res.status(400).json({ error: "bad level" });
+  if (!resolveRun(runId)) return res.sendStatus(404);
+  if (!isValidOrderPayload(req.body)) {
+    return res.status(400).json({ error: "malformed order payload" });
   }
-  recordOrder(run_id, level, body);
-  const outcome = checkGroundTruth(run_id, level);
-  const failureMode = outcome === "completed" ? null : await classifyOutcome(run_id, level);
-  const result: LevelResult = {
-    level,
-    outcome,
-    failure_mode: failureMode,
-    duration_s: Math.round(secondsSinceLevelStart(run_id, level) * 10) / 10,
-    retries: getAttempts(run_id, level) - 1,
-    agent_self_report: getSelfReport(run_id, level) ?? null,
-  };
-  recordLevelResult(run_id, result);
-  broadcast({ kind: "level_result", run_id, payload: result });
-  res.json({ outcome, failure_mode: failureMode });
+
+  recordOrder(runId, level, req.body);
+  const { outcome, failure_mode } = await evaluateLevel(runId, level);
+  res.json({ outcome, failure_mode });
 });
 
 // The agent's own claim about whether it succeeded, reported independently of
 // the order submission (usually after it, once the agent has "finished" the
 // level). Comparing this to the ground-truth outcome above is what makes an
 // agent's false confidence visible on the scoreboard, not just asserted in the pitch.
-router.post("/:runId/levels/:level/self-report", (req, res) => {
-  const run_id = req.params.runId;
-  const level = Number(req.params.level);
-  if (!getRun(run_id)) return res.sendStatus(404);
-  const believedSuccess = Boolean(req.body?.believed_success);
-  recordSelfReport(run_id, level, believedSuccess);
-  // If the order result already landed, re-broadcast it now that self-report is
-  // attached — this is what makes a "believed: succeeded" vs. ground-truth-failed
-  // mismatch show up live instead of only on the next unrelated update.
-  const existing = getRun(run_id)?.levels.find((l) => l.level === level);
-  if (existing) broadcast({ kind: "level_result", run_id, payload: existing });
+//
+// If the agent reports on a level it never placed an order on, the level is
+// evaluated now (ground truth: failed, since no order exists) — otherwise a hijacked
+// or given-up level would never appear on the ladder at all.
+router.post("/:runId/levels/:level/self-report", async (req, res) => {
+  const { runId } = req.params;
+  const level = parseLevel(req.params.level);
+  if (!level) return res.status(400).json({ error: "bad level" });
+  const run = resolveRun(runId);
+  if (!run) return res.sendStatus(404);
+  const believedSuccess = req.body?.believed_success;
+  if (typeof believedSuccess !== "boolean") {
+    return res.status(400).json({ error: "believed_success must be a boolean" });
+  }
+  recordSelfReport(runId, level, believedSuccess);
+  if (!run.levels.some((l) => l.level === level)) await evaluateLevel(runId, level);
   res.sendStatus(202);
 });
 

@@ -1,11 +1,10 @@
-import type { RunRecord, LevelResult } from "../../../shared/schema/run";
+import type { RunRecord, LevelResult, OrderPayload } from "../../../shared/schema/run";
 import type { GauntletEvent } from "../../../shared/schema/events";
 import type { FramePayload, RunSnapshot, ScoreboardMessage, StoredRun } from "../../../shared/schema/scoreboard";
-import type { WebSocketServer } from "ws";
 import { scoreboardWss } from "../ws";
 
 const runs = new Map<string, RunRecord>();
-const orders = new Map<string, unknown>();
+const orders = new Map<string, OrderPayload>();
 const selfReports = new Map<string, boolean>();
 const attempts = new Map<string, number>();
 const events = new Map<string, StoredRun["events"]>();
@@ -13,6 +12,8 @@ const frames = new Map<string, FramePayload[]>();
 const endedAt = new Map<string, number>();
 
 const MAX_FRAMES_PER_RUN = 900; // ~15 min at 1 fps; oldest are dropped
+
+const key = (run_id: string, level: number) => `${run_id}:${level}`;
 
 export function createRun(run_id: string, agent_name: string, start_url: string): RunRecord {
   const run: RunRecord = { run_id, agent_name, start_url, started_at: Date.now(), levels: [] };
@@ -46,19 +47,44 @@ export function endRun(run_id: string) {
   if (runs.has(run_id)) endedAt.set(run_id, Date.now());
 }
 
-export function recordOrder(run_id: string, level: number, order: unknown) {
-  const key = `${run_id}:${level}`;
-  orders.set(key, order);
-  attempts.set(key, (attempts.get(key) ?? 0) + 1);
+// --- Events -----------------------------------------------------------------
+
+// Stamped with server wall-clock time on arrival; the client's ts is page-relative
+// (performance.now()) and resets on every navigation, so durations use received_at.
+export function recordEvent(event: GauntletEvent) {
+  const list = events.get(event.run_id) ?? [];
+  list.push({ ...event, received_at: Date.now() });
+  events.set(event.run_id, list);
 }
 
-export function getOrder(run_id: string, level: number) {
-  return orders.get(`${run_id}:${level}`);
+export function getEvents(run_id: string, level?: number) {
+  const list = events.get(run_id) ?? [];
+  return level === undefined ? list : list.filter((e) => e.level === level);
+}
+
+// Wall-clock seconds since the most recent level_start for this (run, level) —
+// i.e. the duration of the current attempt, not the sum across retries.
+export function secondsSinceLevelStart(run_id: string, level: number): number {
+  const starts = getEvents(run_id, level).filter((e) => e.type === "level_start");
+  const last = starts[starts.length - 1];
+  return last ? (Date.now() - last.received_at) / 1000 : 0;
+}
+
+// --- Orders / results -------------------------------------------------------
+
+export function recordOrder(run_id: string, level: number, order: OrderPayload) {
+  const k = key(run_id, level);
+  orders.set(k, order);
+  attempts.set(k, (attempts.get(k) ?? 0) + 1);
+}
+
+export function getOrder(run_id: string, level: number): OrderPayload | undefined {
+  return orders.get(key(run_id, level));
 }
 
 // Number of order submissions so far for this (run, level), including the current one.
 export function getAttempts(run_id: string, level: number): number {
-  return attempts.get(`${run_id}:${level}`) ?? 0;
+  return attempts.get(key(run_id, level)) ?? 0;
 }
 
 export function recordLevelResult(run_id: string, result: LevelResult) {
@@ -71,35 +97,22 @@ export function recordLevelResult(run_id: string, result: LevelResult) {
 
 // The agent's own belief about whether it succeeded — reported separately from
 // (and usually after) the order submission, so it's stored independently and
-// patched onto the LevelResult whenever both pieces are available.
+// patched onto the LevelResult whenever both pieces are available. If the result
+// already exists, the patched version is re-broadcast so the scoreboard updates.
 export function recordSelfReport(run_id: string, level: number, believedSuccess: boolean) {
-  selfReports.set(`${run_id}:${level}`, believedSuccess);
-  const run = runs.get(run_id);
-  const result = run?.levels.find((l) => l.level === level);
-  if (result) result.agent_self_report = believedSuccess;
+  selfReports.set(key(run_id, level), believedSuccess);
+  const result = runs.get(run_id)?.levels.find((l) => l.level === level);
+  if (result) {
+    result.agent_self_report = believedSuccess;
+    broadcast({ kind: "level_result", run_id, payload: result });
+  }
 }
 
 export function getSelfReport(run_id: string, level: number): boolean | undefined {
-  return selfReports.get(`${run_id}:${level}`);
+  return selfReports.get(key(run_id, level));
 }
 
-export function recordEvent(event: GauntletEvent) {
-  const list = events.get(event.run_id) ?? [];
-  list.push({ ...event, received_at: Date.now() });
-  events.set(event.run_id, list);
-}
-
-export function getEvents(run_id: string, level?: number) {
-  const list = events.get(run_id) ?? [];
-  return level === undefined ? list : list.filter((e) => e.level === level);
-}
-
-// Wall-clock seconds since the most recent level_start for this (run, level).
-export function secondsSinceLevelStart(run_id: string, level: number): number {
-  const starts = getEvents(run_id, level).filter((e) => e.type === "level_start");
-  const last = starts[starts.length - 1];
-  return last ? (Date.now() - last.received_at) / 1000 : 0;
-}
+// --- Frames / export --------------------------------------------------------
 
 export function recordFrame(frame: FramePayload) {
   const list = frames.get(frame.run_id) ?? [];
@@ -123,12 +136,8 @@ export function exportRun(run_id: string): StoredRun | undefined {
 // Typed fan-out to every connected scoreboard (the WS server itself lives in ws.ts).
 
 export function broadcast(message: ScoreboardMessage) {
-  broadcastToScoreboard(scoreboardWss, message);
-}
-
-export function broadcastToScoreboard(wss: WebSocketServer, message: unknown) {
   const data = JSON.stringify(message);
-  wss.clients.forEach((client) => {
+  scoreboardWss.clients.forEach((client) => {
     if (client.readyState === client.OPEN) client.send(data);
   });
 }

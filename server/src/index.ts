@@ -1,7 +1,8 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { createServer } from "node:http";
-import eventsRouter from "./routes/events";
+import eventsRouter, { isGauntletEvent } from "./routes/events";
 import runsRouter from "./routes/runs";
 import { broadcast, recordEvent } from "./store/runStore";
 import { eventsWss, scoreboardWss } from "./ws";
@@ -26,7 +27,13 @@ server.on("upgrade", (req, socket, head) => {
 
 eventsWss.on("connection", (ws) => {
   ws.on("message", (raw) => {
-    const event = JSON.parse(raw.toString());
+    let event: unknown;
+    try {
+      event = JSON.parse(raw.toString());
+    } catch {
+      return; // malformed frame from a misbehaving agent shouldn't kill the run
+    }
+    if (!isGauntletEvent(event)) return; // e.g. no run_id -> would open a phantom scoreboard lane
     recordEvent(event);
     broadcast({ kind: "event", payload: event });
   });
