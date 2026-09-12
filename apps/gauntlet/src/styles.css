@@ -109,3 +109,50 @@ h1 {
 .btn-secondary:hover {
   background: var(--bg);
 }
+
+/* Post-submit confirmation */
+
+.confirmation {
+  padding: 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.confirmation h2 {
+  margin: 0 0 12px;
+  font-size: 22px;
+}
+
+.confirmation-success {
+  border-color: var(--success);
+  background: #eef8f2;
+}
+
+.confirmation-success h2 {
+  color: var(--success);
+}
+
+.confirmation-failure {
+  border-color: var(--accent);
+  background: #fdf0ef;
+}
+
+.confirmation-failure h2 {
+  color: var(--accent);
+}
+
+.confirmation dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.confirmation dt {
+  color: var(--muted);
+}
+
+.confirmation dd {
+  margin: 0;
+  font-weight: 600;
+}
