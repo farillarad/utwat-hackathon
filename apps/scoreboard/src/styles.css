@@ -157,10 +157,11 @@ button:focus-visible,
   background: var(--pending);
 }
 
+/* Static, not pulsing — "live" is already conveyed by the label text, and
+   an idle loop here would be exactly the ambient motion this board avoids. */
 .pill--live .pill__dot {
   background: var(--pass);
   box-shadow: 0 0 0 3px rgba(127, 160, 143, 0.25);
-  animation: pulse 1.6s ease-in-out infinite;
 }
 
 .pill--connecting .pill__dot {
@@ -288,11 +289,11 @@ button:focus-visible,
   color: var(--muted);
 }
 
+/* Split into an outer (position/selection chrome) and an inner (grid layout)
+   element on purpose: the FLIP reorder animation drives a transform on this
+   outer row directly, and the shake below lives on the inner wrapper so the
+   two never compete for the same element's transform. */
 .axis__row {
-  display: grid;
-  grid-template-columns: 200px 74px 1fr;
-  gap: 16px;
-  align-items: center;
   padding: 8px 8px 8px 12px;
   margin: 0 -8px;
   border-radius: 8px;
@@ -307,6 +308,36 @@ button:focus-visible,
 
 .axis__row:hover {
   background: rgba(255, 255, 255, 0.02);
+}
+
+.axis__row-inner {
+  display: grid;
+  grid-template-columns: 200px 74px 1fr;
+  gap: 16px;
+  align-items: center;
+}
+
+.axis__row-inner--shake {
+  animation: axis-row-shake 400ms ease-out;
+}
+
+@keyframes axis-row-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(3px);
+  }
+  60% {
+    transform: translateX(-2px);
+  }
+  80% {
+    transform: translateX(1px);
+  }
 }
 
 /* Selection needs to be unambiguous at a glance: accent border + tinted
@@ -452,12 +483,33 @@ button:focus-visible,
     border-color 0.3s ease;
 }
 
+/* Full saturation, static — the selected run's severance point. It flares
+   once (below) the instant it becomes a failure, then holds still; it does
+   not loop while it stays selected. */
 .axis__break--selected {
   width: 13px;
   height: 13px;
   border-right-color: var(--fail);
   border-bottom-color: var(--fail);
-  animation: axis-break-pulse 1.6s ease-in-out infinite;
+}
+
+.axis__break--flare {
+  animation: axis-break-flare 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes axis-break-flare {
+  0% {
+    transform: translate(-50%, -50%) rotate(45deg) scale(1);
+    filter: drop-shadow(0 0 0 rgba(255, 59, 48, 0));
+  }
+  35% {
+    transform: translate(-50%, -50%) rotate(45deg) scale(1.7);
+    filter: drop-shadow(0 0 8px rgba(255, 59, 48, 0.75));
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(45deg) scale(1);
+    filter: drop-shadow(0 0 0 rgba(255, 59, 48, 0));
+  }
 }
 
 /* Ended without failing but never reached the last level — distinct from
@@ -486,13 +538,51 @@ button:focus-visible,
   white-space: nowrap;
 }
 
-@keyframes axis-break-pulse {
-  0%,
-  100% {
-    filter: drop-shadow(0 0 0 rgba(255, 59, 48, 0.6));
+/* Traversal pip — replay only. Position is driven every frame by JS while
+   playing, so no CSS transition on `left`: a transition would constantly lag
+   behind the rAF-driven target instead of tracking it. Manual scrubbing is
+   the same instant-jump for the same reason. */
+.axis__pip {
+  position: absolute;
+  top: calc(50% - 16px);
+  width: 8px;
+  height: 8px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--live);
+  box-shadow: 0 0 6px 1px rgba(255, 198, 92, 0.7);
+}
+
+/* Hits a severance: flares once and holds (no bounce, no loop). */
+.axis__pip--flare {
+  background: var(--fail);
+  box-shadow: 0 0 6px 1px rgba(255, 59, 48, 0.7);
+  animation: axis-pip-flare 500ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes axis-pip-flare {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
   }
-  50% {
-    filter: drop-shadow(0 0 5px rgba(255, 59, 48, 0.6));
+  40% {
+    transform: translate(-50%, -50%) scale(2.2);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* Reaches a clean stop (no failure): fades out rather than flaring. */
+.axis__pip--fade {
+  animation: axis-pip-fade 400ms ease-out forwards;
+}
+
+@keyframes axis-pip-fade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 
@@ -519,11 +609,27 @@ button:focus-visible,
   opacity: 0.4;
 }
 
+/* Static while it stays "current" — it only animates in once, the instant
+   the agent's position moves onto it (see .axis__node--current-enter). */
 .axis__node--current {
   border-color: var(--live);
   color: var(--live);
   background: rgba(255, 198, 92, 0.15);
-  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.axis__node--current-enter {
+  animation: axis-node-current-enter 400ms ease-out;
+}
+
+@keyframes axis-node-current-enter {
+  from {
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
 }
 
 .axis__node--pass {
@@ -549,6 +655,93 @@ button:focus-visible,
   border-color: var(--fail-dim);
   color: var(--fail-dim);
   background: rgba(122, 70, 66, 0.14);
+}
+
+/* ---- Replay controls --------------------------------------------------- */
+
+.replay {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.replay__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.replay__btn:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+
+.replay__btn:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.replay__scrub {
+  flex: 1;
+  accent-color: var(--live);
+}
+
+.replay__scrub:disabled {
+  opacity: 0.4;
+}
+
+.replay__time {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.replay__speeds {
+  display: flex;
+  gap: 4px;
+}
+
+.replay__speed {
+  padding: 3px 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.replay__speed:hover:not(:disabled) {
+  border-color: var(--muted);
+  color: var(--text);
+}
+
+.replay__speed:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.replay__speed--active {
+  color: var(--bg);
+  background: var(--live);
+  border-color: var(--live);
+  font-weight: 700;
 }
 
 /* ---- Selection detail row: video feed | failure hero ------------------- */
@@ -718,12 +911,27 @@ button:focus-visible,
    The board's one failure detail panel, driven by whichever run is
    selected. Nothing else on the board uses --fail at this weight/scale. */
 
+/* Mount-triggered, not looping — ComparisonBoard keys this component by
+   run+level, so switching to a different failure remounts it and replays
+   this once. Reduced motion turns it off below. */
 .failure-hero {
   border: 1px solid rgba(255, 59, 48, 0.45);
   background: linear-gradient(180deg, rgba(255, 59, 48, 0.1), rgba(255, 59, 48, 0.02));
   border-radius: 10px;
   padding: 16px 18px;
   box-shadow: 0 0 0 1px rgba(255, 59, 48, 0.08), 0 10px 28px rgba(255, 59, 48, 0.12);
+  animation: failure-hero-enter 300ms ease-out;
+}
+
+@keyframes failure-hero-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .failure-hero-head {
@@ -917,6 +1125,36 @@ button:focus-visible,
   background: rgba(255, 255, 255, 0.02);
 }
 
+/* Fades with age as rows scroll up — purely structural (nth-last-child), no
+   JS or per-row state needed. The empty aria-hidden scroll anchor is always
+   the actual last child, so real rows start at nth-last-child(2). */
+.trace__row:nth-last-child(n + 16) {
+  opacity: 0.75;
+}
+
+.trace__row:nth-last-child(n + 31) {
+  opacity: 0.5;
+}
+
+/* Mount-triggered slide-in + fade for genuinely new rows only — TraceLog
+   keys rows by event identity, so existing rows keep their DOM node across
+   re-renders and never replay this. animation-delay (set inline, capped) is
+   what staggers a burst of several arriving together. */
+.trace__row--enter {
+  animation: trace-row-enter 220ms ease-out both;
+}
+
+@keyframes trace-row-enter {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 .trace__source {
   font-weight: 700;
   overflow: hidden;
@@ -966,21 +1204,21 @@ button:focus-visible,
 
 /* ---- Motion --------------------------------------------------------- */
 
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.45;
-  }
-}
-
+/* "Keep instant state changes" means every transition on the board becomes
+   an instant snap, not just the three named in the brief (traversal, shake,
+   stagger) — so this is a blanket rule, not a per-class list. Belt-and-
+   suspenders on top of the JS: components already gate each new class
+   behind a `!reducedMotion` check (so most of these never even get applied
+   when this query matches), the FLIP hook is passed `disabled` directly,
+   and useReplay collapses straight to the end state with playback controls
+   disabled. This just guarantees nothing animates even if something slips
+   through, including the pre-existing rail-fill/node/row transitions. */
 @media (prefers-reduced-motion: reduce) {
-  .pill--live .pill__dot,
-  .axis__node--current,
-  .axis__break {
-    animation: none;
+  .comparison *,
+  .comparison *::before,
+  .comparison *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }
 
