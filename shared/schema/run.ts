@@ -7,10 +7,10 @@ export type LevelOutcome =
 
 export interface LevelResult {
   level: number;
-  outcome: LevelOutcome;
-  failure_mode: LevelOutcome | null;
+  outcome: "completed" | "failed"; // ground truth (PRD §7)
+  failure_mode: LevelOutcome | null; // classifier label, null if completed
   duration_s: number;
-  retries?: number;
+  retries: number; // attempts before this result
 }
 
 export interface RunRecord {
