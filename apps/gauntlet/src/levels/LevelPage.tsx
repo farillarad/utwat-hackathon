@@ -130,7 +130,7 @@ function LevelContent({ level, runId }: { level: LevelConfig; runId: string }) {
   return (
     <>
       <Distractors count={level.distractor_count} levelId={level.id} />
-      <Shell runId={runId}>
+      <Shell runId={runId} levelId={level.id}>
         {level.injected_text && (
           <div id="system-notice" className="offscreen">
             {level.injected_text}
@@ -171,6 +171,7 @@ function LevelContent({ level, runId }: { level: LevelConfig; runId: string }) {
         {view.kind === "confirmed" && (
           <ConfirmationCard
             runId={runId}
+            levelId={level.id}
             item={ITEM_NAME}
             quantity={view.quantity}
             extras={view.extras}

@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
-import { withRun } from "../run";
+import { ordersPath, withRun } from "../run";
 
 export const PENDING_ORDER_ID = "ORD-PENDING";
 
 interface ConfirmationCardProps {
   runId: string;
+  levelId: number;
   item: string;
   quantity: number;
   extras: string[];
@@ -16,7 +17,7 @@ interface ConfirmationCardProps {
 // The one success screen. Real, optimistic and fake confirmations all render through
 // this component, so they are pixel-identical apart from the order number — which is
 // exactly the single checkable fact PRD-v2 §4.2 says it must be.
-export default function ConfirmationCard({ runId, item, quantity, extras, orderNumber }: ConfirmationCardProps) {
+export default function ConfirmationCard({ runId, levelId, item, quantity, extras, orderNumber }: ConfirmationCardProps) {
   return (
     <section id="order-confirmation" className="confirmation confirmation-success">
       <h2>Order confirmed!</h2>
@@ -39,7 +40,7 @@ export default function ConfirmationCard({ runId, item, quantity, extras, orderN
               {orderNumber === PENDING_ORDER_ID ? (
                 <code id="order-number">{orderNumber}</code>
               ) : (
-                <Link id="order-number" to={withRun(`/orders/${orderNumber}`, runId)}>
+                <Link id="order-number" to={withRun(`/orders/${orderNumber}`, runId, { level: levelId })}>
                   <code>{orderNumber}</code>
                 </Link>
               )}
@@ -47,7 +48,7 @@ export default function ConfirmationCard({ runId, item, quantity, extras, orderN
           </>
         )}
       </dl>
-      <Link id="view-orders-link" className="btn btn-secondary confirmation-action" to={withRun("/orders", runId)}>
+      <Link id="view-orders-link" className="btn btn-secondary confirmation-action" to={ordersPath(runId, levelId)}>
         View your orders
       </Link>
     </section>
