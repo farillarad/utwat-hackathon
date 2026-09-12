@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import Ladder from "./components/Ladder";
+import TransitLine, { LEVEL_COUNT } from "./components/TransitLine";
+import FailureHero from "./components/FailureHero";
+import AgentPanel from "./components/AgentPanel";
 import TraceLog from "./components/TraceLog";
-import AgentView from "./components/AgentView";
 import { useRunStream } from "./ws/useRunStream";
 
 // Ladder Score per PRD §10: highest level cleanly completed x10, minus a
@@ -46,26 +47,71 @@ function useCountUp(value: number, duration = 500) {
 export default function App() {
   const { levels, events } = useRunStream();
   const score = useCountUp(ladderScore(levels));
+  const maxScore = LEVEL_COUNT * 10;
+
+  const passCount = levels.filter((l) => l.outcome === "completed").length;
+  const failCount = levels.filter((l) => l.outcome === "failed").length;
+  const totalDuration = levels.reduce((sum, l) => sum + (l.duration_s ?? 0), 0);
+  const failureModeCounts = levels.reduce<Record<string, number>>((acc, l) => {
+    if (l.failure_mode) acc[l.failure_mode] = (acc[l.failure_mode] ?? 0) + 1;
+    return acc;
+  }, {});
+  const firstFailure = levels.find((l) => l.outcome === "failed");
 
   return (
     <div className="scoreboard">
       <header className="scoreboard-header">
         <div>
-          <div className="scoreboard-title">
-            Agent Stress-Test <span>Gauntlet</span>
-          </div>
-          <div className="scoreboard-subtitle">Live robustness profile</div>
+          <div className="scoreboard-kicker">Agent Stress-Test</div>
+          <div className="scoreboard-title">Gauntlet</div>
         </div>
-        <div>
+        <div className="score-block">
           <div className="score-label">Ladder Score</div>
-          <div className="score-value">{score}</div>
+          <div className="score-value">
+            {score}
+            <span className="score-max">/{maxScore}</span>
+          </div>
         </div>
       </header>
-      <AgentView isLive={events.length > 0} />
-      <div className="ladder-panel">
+
+      <div className="stats-strip">
+        <div className="stat">
+          <span className="stat-value">{passCount}</span>
+          <span className="stat-label">Passed</span>
+        </div>
+        <div className="stat stat-danger">
+          <span className="stat-value">{failCount}</span>
+          <span className="stat-label">Failed</span>
+        </div>
+        <div className="stat">
+          <span className="stat-value">
+            {levels.length}/{LEVEL_COUNT}
+          </span>
+          <span className="stat-label">Attempted</span>
+        </div>
+        <div className="stat">
+          <span className="stat-value">{totalDuration.toFixed(1)}s</span>
+          <span className="stat-label">Total Time</span>
+        </div>
+        {Object.entries(failureModeCounts).map(([mode, count]) => (
+          <div className="stat stat-tag" key={mode}>
+            <span className="stat-value">{count}×</span>
+            <span className="stat-label">{mode}</span>
+          </div>
+        ))}
+      </div>
+
+      <section className="panel transit-panel">
+        <h2 className="panel-title">Run Progress</h2>
+        <TransitLine levels={levels} />
+      </section>
+
+      {firstFailure && <FailureHero result={firstFailure} events={events} />}
+
+      <div className="lower-grid">
         <section className="panel">
-          <h2 className="panel-title">Ladder</h2>
-          <Ladder levels={levels} />
+          <h2 className="panel-title">Agent</h2>
+          <AgentPanel levels={levels} events={events} />
         </section>
         <section className="panel">
           <h2 className="panel-title">Trace</h2>
