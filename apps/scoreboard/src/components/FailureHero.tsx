@@ -21,13 +21,14 @@ interface Props {
 // entirely from data ComparisonBoard already has (levels/events); no new
 // data flow.
 export default function FailureHero({ result, events, runName }: Props) {
-  const trace = events.filter((e) => e.level === result.level).slice(-TRACE_EXCERPT_LINES);
+  const levelEvents = events.filter((e) => e.level === result.level);
+  const trace = levelEvents.slice(-TRACE_EXCERPT_LINES);
   const selfReport = result.agent_self_report;
   const hasSelfReport = selfReport !== null && selfReport !== undefined;
   const mismatch = hasSelfReport && selfReport !== (result.outcome === "completed");
 
   return (
-    <section className="failure-hero" aria-live="polite">
+    <section className="failure-hero panel panel--frame panel--chamfer" aria-live="polite">
       <div className="failure-hero-head">
         <span className="failure-hero-kicker">
           {runName} · run severed — Level {result.level}
@@ -35,20 +36,38 @@ export default function FailureHero({ result, events, runName }: Props) {
         <h3 className="failure-hero-mode">{result.failure_mode ? label(result.failure_mode) : "failed"}</h3>
       </div>
 
-      {/* The core finding: what the agent believed vs. what actually happened.
-          Second-most prominent element in the card, directly under the
-          failure-mode heading and before the trace excerpt. */}
-      <div className="failure-hero-belief" data-mismatch={hasSelfReport && mismatch ? "true" : "false"}>
-        {hasSelfReport ? (
-          <>
-            agent believed: <strong>{selfReport ? "succeeded" : "failed"}</strong> · ground truth:{" "}
-            <strong>failed</strong>
-            {mismatch && <span className="failure-hero-belief-tag">contradiction</span>}
-          </>
-        ) : (
-          <span className="failure-hero-belief-pending">agent did not self-report on this level</span>
+      {/* Instrument-readout stats, not prose: level / duration / event count
+          alongside the belief-vs-truth line, instead of leaving the card's
+          most valuable slot as a single sentence. */}
+      <div className="failure-hero-stats">
+        <span className="failure-hero-stat">
+          <span className="failure-hero-stat-label">Level</span>
+          <span className="failure-hero-stat-value">{result.level}</span>
+        </span>
+        <span className="failure-hero-stat">
+          <span className="failure-hero-stat-label">Duration</span>
+          <span className="failure-hero-stat-value">{result.duration_s.toFixed(1)}s</span>
+        </span>
+        <span className="failure-hero-stat">
+          <span className="failure-hero-stat-label">Events</span>
+          <span className="failure-hero-stat-value">{levelEvents.length}</span>
+        </span>
+        {/* The core finding: what the agent believed vs. what actually
+            happened. When there's no self-report, that's rendered as a
+            small dim tag (below the stats block) rather than a large
+            placeholder sentence occupying this row. */}
+        {hasSelfReport && (
+          <span className={`failure-hero-stat${mismatch ? " failure-hero-stat--mismatch" : ""}`}>
+            <span className="failure-hero-stat-label">Agent believed</span>
+            <span className="failure-hero-stat-value">
+              {selfReport ? "succeeded" : "failed"}
+              {mismatch && <span className="failure-hero-belief-tag">contradiction</span>}
+            </span>
+          </span>
         )}
       </div>
+
+      {!hasSelfReport && <span className="failure-hero-no-report">no self-report</span>}
 
       {trace.length > 0 && (
         <pre className="failure-hero-trace">

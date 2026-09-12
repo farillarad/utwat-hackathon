@@ -16,7 +16,6 @@ export interface AgentSummary {
   score: number;
   maxScore: number;
   levels: LevelResult[];
-  ended: boolean;
 }
 
 interface Props {
@@ -27,7 +26,7 @@ interface Props {
 
 export default function AgentView({ frame, ended, summary }: Props) {
   return (
-    <figure className="browser">
+    <figure className="browser panel panel--bracket">
       <figcaption className="browser__chrome">
         <span className="browser__dots" aria-hidden />
         <span className="browser__url">{frame?.url ?? summary?.runName ?? "—"}</span>
@@ -39,7 +38,7 @@ export default function AgentView({ frame, ended, summary }: Props) {
         ) : summary ? (
           <div className="browser__summary">
             <div className="browser__summary-head">
-              <span className="browser__summary-status">{summary.ended ? "Run finished" : "No frame yet"}</span>
+              <span className="browser__summary-title">Level breakdown</span>
               <span className="browser__summary-score">
                 {summary.score}
                 <span className="browser__summary-max">/{summary.maxScore}</span>
