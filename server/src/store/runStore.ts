@@ -197,7 +197,7 @@ export class RunStore {
   recordEvent(event: GauntletEvent): boolean {
     const run = this.runs.get(event.run_id);
     if (!run) return false;
-    run.page_events.push(event);
+    run.page_events.push({ ...event, received_at: Date.now() });
     this.save(run);
     return true;
   }

@@ -7,7 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p .",
     "start": "node dist/index.js",
-    "test": "tsx --test \"test/**/*.test.ts\""
+    "test": "tsx --test \"test/**/*.test.ts\"",
+    "detector": "tsx src/detector/cli.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

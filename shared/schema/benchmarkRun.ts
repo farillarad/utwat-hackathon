@@ -24,6 +24,11 @@ export interface VerifyAttempt {
   ts: number;
 }
 
+// A page event as stored: stamped with server wall-clock time on arrival. The page's
+// own `ts` is performance.now() and resets on every navigation, so ordering against
+// the trajectory and orders uses received_at.
+export type PageEvent = GauntletEvent & { received_at: number };
+
 export interface RunRecord {
   run_id: string;
   agent_name: string;
@@ -50,7 +55,7 @@ export interface RunRecord {
   verify_attempts: VerifyAttempt[];
 
   trajectory: Step[]; // agent-side, from the adapter
-  page_events: GauntletEvent[]; // page-side, from the gauntlet's event logger
+  page_events: PageEvent[]; // page-side, from the gauntlet's event logger
   steps_used: number;
   llm_cost_usd: number;
   steel_session_id?: string;
