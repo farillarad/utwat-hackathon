@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, ReactNode, useState } from "react";
 import { logEvent, getRunId } from "../instrumentation/eventLogger";
 
 // What the server's ground-truth check said about the submitted order. "error"
@@ -25,6 +25,11 @@ interface CheckoutFormProps {
   // real cursor (or a Playwright-driven click, which moves the mouse to the
   // target before pressing) approaches it.
   onApproachSubmit?: () => void;
+  // Level 3: replaces the default "Complete order" button with the level's own
+  // submit buttons (the decoy "Continue" pair).
+  submitButtons?: ReactNode;
+  // Level 3: extra line items to attach, based on which submit button was pressed.
+  getExtraItems?: (submitterId: string) => string[];
 }
 
 const API_URL = import.meta.env.VITE_INSTRUMENTATION_API ?? "http://localhost:4000";
@@ -37,6 +42,8 @@ export default function CheckoutForm({
   showHoneypot = false,
   submitButtonId = "submit-button",
   onApproachSubmit,
+  submitButtons,
+  getExtraItems,
 }: CheckoutFormProps) {
   const [quantity, setQuantity] = useState(1);
   const [zip, setZip] = useState("");
@@ -45,8 +52,10 @@ export default function CheckoutForm({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    logEvent(level, "click", submitButtonId);
+    const submitterId = (e.nativeEvent as SubmitEvent).submitter?.id || submitButtonId;
+    logEvent(level, "click", submitterId);
     onSubmit?.({ item, quantity });
+    const extraItems = getExtraItems?.(submitterId);
     let result: { outcome?: string } | null = null;
     try {
       const res = await fetch(`${API_URL}/api/runs/${getRunId()}/levels/${level}/order`, {
@@ -57,6 +66,7 @@ export default function CheckoutForm({
           quantity,
           ...(showZip ? { zip } : {}),
           ...(showHoneypot ? { honeypot_middle_name: middleName } : {}),
+          ...(extraItems ? { extra_items: extraItems } : {}),
         }),
       });
       result = await res.json().catch(() => null);
@@ -111,14 +121,16 @@ export default function CheckoutForm({
           autoComplete="off"
         />
       )}
-      <button
-        type="submit"
-        id={submitButtonId}
-        className="btn btn-primary"
-        onPointerEnter={onApproachSubmit}
-      >
-        Complete order
-      </button>
+      {submitButtons ?? (
+        <button
+          type="submit"
+          id={submitButtonId}
+          className="btn btn-primary"
+          onPointerEnter={onApproachSubmit}
+        >
+          Complete order
+        </button>
+      )}
     </form>
   );
 }
