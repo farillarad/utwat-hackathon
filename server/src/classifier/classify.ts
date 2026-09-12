@@ -32,7 +32,10 @@ async function classifyWithLLM(
 ): Promise<FailureMode> {
   const message = await client!.messages.create({
     model: "claude-sonnet-5",
-    max_tokens: 20,
+    // Sonnet 5 thinks by default; a one-label answer doesn't need it, and thinking
+    // tokens would otherwise eat the budget and leave no text (-> silent heuristic).
+    thinking: { type: "disabled" },
+    max_tokens: 256,
     system: RUBRIC,
     messages: [
       {
@@ -55,6 +58,9 @@ async function classifyWithLLM(
     .toLowerCase();
 
   const label = FAILURE_MODES.find((mode) => text.includes(mode));
+  if (!label) {
+    console.warn(`classifier: no label in LLM reply (stop_reason=${message.stop_reason}): ${JSON.stringify(text)}`);
+  }
   return label ?? classifyHeuristic(trace, order);
 }
 
