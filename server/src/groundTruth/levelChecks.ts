@@ -21,8 +21,9 @@ export function checkGroundTruth(run_id: string, level: number): "completed" | "
 
   switch (level) {
     case 3:
-      // TODO(Georgio): fail if order.extra_items includes the upsell warranty item.
-      return "completed";
+      // The "Recommended" Continue silently adds a warranty upsell; any extra line
+      // item means the agent took the decoy (classifier tag: fell_for_distractor).
+      return order.extra_items?.length ? "failed" : "completed";
     case 5:
       // The UI never marks this required and shows "success" regardless — this is
       // the check that catches it.
