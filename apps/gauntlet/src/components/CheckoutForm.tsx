@@ -1,9 +1,20 @@
 import { FormEvent, useState } from "react";
 import { logEvent, getRunId } from "../instrumentation/eventLogger";
 
+// What the server's ground-truth check said about the submitted order. "error"
+// means the server was unreachable or returned something unparseable.
+export interface OrderResult {
+  outcome: "completed" | "failed" | "error";
+  item: string;
+  quantity: number;
+}
+
 interface CheckoutFormProps {
   level: number;
   onSubmit?: (values: { item: string; quantity: number }) => void;
+  // Fired after the server responds. Levels that show the real outcome (1-3) use
+  // this; Level 5 deliberately ignores it and trusts onSubmit instead.
+  onResult?: (result: OrderResult) => void;
   // Level 5: a required-server-side ZIP that's never marked required in the UI.
   showZip?: boolean;
   // Level 6: an invisible field a naive "fill every DOM field" agent will populate.
@@ -21,6 +32,7 @@ const API_URL = import.meta.env.VITE_INSTRUMENTATION_API ?? "http://localhost:40
 export default function CheckoutForm({
   level,
   onSubmit,
+  onResult,
   showZip = false,
   showHoneypot = false,
   submitButtonId = "submit-button",
@@ -35,18 +47,26 @@ export default function CheckoutForm({
     e.preventDefault();
     logEvent(level, "click", submitButtonId);
     onSubmit?.({ item, quantity });
-    const res = await fetch(`${API_URL}/api/runs/${getRunId()}/levels/${level}/order`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        item,
-        quantity,
-        ...(showZip ? { zip } : {}),
-        ...(showHoneypot ? { honeypot_middle_name: middleName } : {}),
-      }),
-    });
-    const result: { outcome?: string } | null = await res.json().catch(() => null);
+    let result: { outcome?: string } | null = null;
+    try {
+      const res = await fetch(`${API_URL}/api/runs/${getRunId()}/levels/${level}/order`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          item,
+          quantity,
+          ...(showZip ? { zip } : {}),
+          ...(showHoneypot ? { honeypot_middle_name: middleName } : {}),
+        }),
+      });
+      result = await res.json().catch(() => null);
+    } catch {
+      // Server unreachable — reported to the level as "error" below.
+    }
     logEvent(level, "level_end", undefined, result?.outcome ?? "unknown");
+    const outcome =
+      result?.outcome === "completed" || result?.outcome === "failed" ? result.outcome : "error";
+    onResult?.({ outcome, item, quantity });
   };
 
   return (
