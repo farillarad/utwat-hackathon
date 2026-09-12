@@ -40,7 +40,7 @@ eventsWss.on("connection", (ws) => {
       return; // malformed frame from a misbehaving agent shouldn't kill the run
     }
     addEvent(event);
-    broadcastToScoreboard({ kind: "event", payload: event });
+    broadcastToScoreboard({ kind: "event", run_id: event.run_id, payload: event });
   });
 });
 

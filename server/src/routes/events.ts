@@ -11,7 +11,7 @@ router.post("/", (req, res) => {
     return res.sendStatus(400);
   }
   addEvent(event as GauntletEvent);
-  broadcastToScoreboard({ kind: "event", payload: event });
+  broadcastToScoreboard({ kind: "event", run_id: event.run_id, payload: event });
   res.sendStatus(202);
 });
 

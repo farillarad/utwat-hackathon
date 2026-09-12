@@ -64,7 +64,7 @@ router.post("/:runId/levels/:level/order", async (req, res) => {
     agent_self_report: getSelfReport(runId, level) ?? null,
   };
   recordLevelResult(runId, result);
-  broadcastToScoreboard({ kind: "level_result", payload: result });
+  broadcastToScoreboard({ kind: "level_result", run_id: runId, payload: result });
 
   res.json({ outcome, failure_mode: failureMode });
 });

@@ -75,7 +75,7 @@ export function recordSelfReport(run_id: string, level: number, believedSuccess:
   const result = runs.get(run_id)?.levels.find((l) => l.level === level);
   if (result) {
     result.agent_self_report = believedSuccess;
-    broadcastToScoreboard({ kind: "level_result", payload: result });
+    broadcastToScoreboard({ kind: "level_result", run_id, payload: result });
   }
 }
 
