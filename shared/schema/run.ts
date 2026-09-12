@@ -7,6 +7,9 @@ export const FAILURE_MODES = [
 
 export type FailureMode = (typeof FAILURE_MODES)[number];
 
+// Legacy name for "any per-level outcome label" — kept so older imports keep compiling.
+export type LevelOutcome = "completed" | FailureMode;
+
 // run_id the gauntlet's eventLogger falls back to when the page has no ?run_id=
 // (i.e. a human clicking through for acceptance testing). The server auto-creates
 // this run so manual tests still produce real ground-truth results.
@@ -17,7 +20,7 @@ export type { OrderPayload } from "./order";
 
 export interface LevelResult {
   level: number;
-  outcome: "completed" | "failed"; // ground truth
+  outcome: "completed" | "failed"; // ground truth (PRD §7)
   failure_mode: FailureMode | null; // classifier label, null if completed
   duration_s: number;
   retries: number; // attempts before this result

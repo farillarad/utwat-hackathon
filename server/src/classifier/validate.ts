@@ -2,7 +2,7 @@ import "dotenv/config";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { addEvent, createRun, recordOrder } from "../store/runStore";
+import { createRun, recordEvent, recordOrder } from "../store/runStore";
 import { checkGroundTruth } from "../groundTruth/levelChecks";
 import { classifyOutcome } from "./classify";
 import type { GauntletEvent } from "../../../shared/schema/events";
@@ -38,7 +38,7 @@ const rows: string[] = [];
 for (const [i, f] of fixtures.entries()) {
   const run_id = `fixture-${i}`;
   createRun(run_id, "fixture", `/level/${f.level}`);
-  f.trace.forEach((e, ts) => addEvent({ run_id, level: f.level, ts: ts * 250, ...e }));
+  f.trace.forEach((e, ts) => recordEvent({ run_id, level: f.level, ts: ts * 250, ...e }));
   if (f.order) recordOrder(run_id, f.level, f.order);
 
   const outcome = checkGroundTruth(run_id, f.level);

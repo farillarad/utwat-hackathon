@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { RUBRIC, FAILURE_MODES, type FailureMode } from "./rubric";
-import { getTrace, getOrder } from "../store/runStore";
+import { getEvents, getOrder } from "../store/runStore";
 import type { GauntletEvent } from "../../../shared/schema/events";
 import type { OrderPayload } from "../../../shared/schema/run";
 
@@ -12,7 +12,7 @@ import type { OrderPayload } from "../../../shared/schema/run";
 const client = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
 
 export async function classifyOutcome(run_id: string, level: number): Promise<FailureMode> {
-  const trace = getTrace(run_id, level);
+  const trace = getEvents(run_id, level);
   const order = getOrder(run_id, level);
 
   if (client) {

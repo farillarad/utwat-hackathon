@@ -1,17 +1,17 @@
 import { Router } from "express";
-import { addEvent, broadcastToScoreboard } from "../store/runStore";
+import { broadcast, recordEvent } from "../store/runStore";
 import type { GauntletEvent } from "../../../shared/schema/events";
 
 const router = Router();
 
 // REST fallback for posting events (primary path is the /events WebSocket in index.ts).
 router.post("/", (req, res) => {
-  const event = req.body as Partial<GauntletEvent>;
-  if (!event.run_id || typeof event.level !== "number" || !event.type) {
-    return res.sendStatus(400);
+  const event = req.body as Partial<GauntletEvent> | undefined;
+  if (!event || typeof event.run_id !== "string" || typeof event.level !== "number" || typeof event.type !== "string") {
+    return res.status(400).json({ error: "GauntletEvent requires run_id, level and type" });
   }
-  addEvent(event as GauntletEvent);
-  broadcastToScoreboard({ kind: "event", run_id: event.run_id, payload: event });
+  recordEvent(event as GauntletEvent);
+  broadcast({ kind: "event", payload: event as GauntletEvent });
   res.sendStatus(202);
 });
 

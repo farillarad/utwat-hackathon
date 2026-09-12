@@ -3,7 +3,7 @@
 See [PRD.md](PRD.md) for the full spec, scope decisions, timeline, and team assignments.
 
 ## Structure
-test
+
 ```
 apps/
   gauntlet/        Georgio + Tanay — the obstacle levels (1-6), React + Vite
@@ -21,9 +21,16 @@ scripts/           Ops scripts (e.g. replay-run.ts for the backup-run demo)
 npm install
 npm run dev   # runs gauntlet (5173), scoreboard (5174), and server (4000) in parallel
 
-cd agent-adapter && pip install -r requirements.txt
-python browser_use_runner.py
+cd agent-adapter && pip install -r requirements.txt && python -m playwright install chromium
+cp .env.example .env            # add ANTHROPIC_API_KEY
+python scripted_runner.py       # no-LLM pipeline check: real browser through levels 1,2,4,5
+python browser_use_runner.py    # Browser Use
+python raw_llm_loop.py          # our own Claude tool-use loop
 ```
+
+Backup demo: `npm run export -- --latest` saves the last run to `data/runs/`, and
+`npm run replay -- data/runs/<file>.json` streams it back to the scoreboard with the
+original timing. See `agent-adapter/adapter_contract.md`.
 
 Gauntlet levels: `http://localhost:5173/level/1` … `/level/6`
 Scoreboard: `http://localhost:5174`

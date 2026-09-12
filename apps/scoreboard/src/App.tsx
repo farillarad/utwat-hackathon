@@ -1,18 +1,52 @@
-import Ladder from "./components/Ladder";
-import TraceLog from "./components/TraceLog";
-import AgentView from "./components/AgentView";
+import RunLane from "./components/RunLane";
 import { useRunStream } from "./ws/useRunStream";
 
+const MAX_LANES = 2;
+
 export default function App() {
-  const { levels, events } = useRunStream();
+  const { runs, connection, dismiss, clearAll } = useRunStream();
+  // Newest runs win the screen; older ones are still in memory and reappear when a lane is dismissed.
+  const visible = runs.slice(-MAX_LANES);
 
   return (
-    <div className="scoreboard">
-      <AgentView />
-      <div className="ladder-panel">
-        <Ladder levels={levels} />
-        <TraceLog events={events} />
-      </div>
+    <div className="board">
+      <header className="board__head">
+        <div className="board__title">
+          <span className="board__eyebrow">Agent stress-test</span>
+          <h1>Gauntlet</h1>
+        </div>
+        <div className="board__status">
+          <span className={`pill pill--${connection}`}>
+            <i className="pill__dot" />
+            {connection === "live" ? "Live feed" : connection === "connecting" ? "Connecting" : "Feed offline"}
+          </span>
+          <span className="board__count">
+            {runs.length === 0 ? "No runs" : `${runs.length} run${runs.length === 1 ? "" : "s"}`}
+          </span>
+          {runs.length > 0 && (
+            <button className="btn" onClick={clearAll}>
+              Clear board
+            </button>
+          )}
+        </div>
+      </header>
+
+      {visible.length === 0 ? (
+        <section className="empty">
+          <p className="empty__lead">Waiting for an agent to start a run.</p>
+          <p className="empty__hint">
+            Point an adapter at the gauntlet: <code>python agent-adapter/raw_llm_loop.py</code> or{" "}
+            <code>python agent-adapter/browser_use_runner.py</code>. To replay a stored run:{" "}
+            <code>npx tsx scripts/replay-run.ts data/runs/&lt;file&gt;.json</code>
+          </p>
+        </section>
+      ) : (
+        <main className="lanes" data-lanes={visible.length}>
+          {visible.map((run) => (
+            <RunLane key={run.run_id} run={run} onDismiss={() => dismiss(run.run_id)} />
+          ))}
+        </main>
+      )}
     </div>
   );
 }
