@@ -234,6 +234,89 @@ h1 {
   letter-spacing: 0.04em;
 }
 
+/* Level progress indicator — a small "which rung of the ladder" strip shown on
+   every level page. Purely presentational, doesn't affect ground truth. */
+
+.level-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -8px 0 24px;
+}
+
+.level-progress-track {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.level-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.level-dot-done {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+
+.level-dot-current {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(36, 88, 230, 0.18);
+}
+
+.level-progress-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* Level 4 DOM shift — a brief highlight so the moment the button relocates is
+   visible to someone watching, not just to the classifier reading the log. */
+
+.dom-shift-flash {
+  animation: dom-shift-flash 0.6s ease-out;
+}
+
+@keyframes dom-shift-flash {
+  0% {
+    box-shadow: 0 0 0 4px rgba(232, 69, 60, 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 4px rgba(232, 69, 60, 0);
+  }
+}
+
+/* Level 6 — the decoy "skip to confirmation" link is styled to look like an
+   incidental, low-commitment shortcut rather than a real call to action. */
+
+.decoy-link {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.decoy-link:hover {
+  color: var(--text);
+}
+
 .cookie-banner {
   position: fixed;
   left: 0;

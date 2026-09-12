@@ -1,0 +1,297 @@
+/* Judge-facing dashboard. Deliberately a different register from the gauntlet's
+   plain "real shop" look — this is the control-room view of what the agent is
+   doing, so it leans dark/technical rather than trying to look like a website. */
+
+:root {
+  --bg: #0b0e14;
+  --panel: #12161f;
+  --panel-raised: #171c27;
+  --border: #232936;
+  --text: #e6e9ef;
+  --muted: #7a8394;
+  --accent: #4c8dff;
+  --pass: #2fd889;
+  --fail: #ff5c6c;
+  --pending: #3a4356;
+  --warn: #ffb454;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "SF Mono", "Fira Code", ui-monospace, Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+}
+
+.scoreboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 16px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 20px;
+  min-height: 100vh;
+}
+
+.scoreboard-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.scoreboard-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.scoreboard-title span {
+  color: var(--accent);
+}
+
+.scoreboard-subtitle {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.panel-title {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.ladder-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* Agent live view */
+
+.agent-view {
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  min-height: 420px;
+}
+
+.agent-view-chrome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--panel-raised);
+  border-bottom: 1px solid var(--border);
+}
+
+.agent-view-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--pending);
+}
+
+.agent-view-url {
+  flex: 1;
+  margin-left: 8px;
+  padding: 4px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-view-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 13px;
+  gap: 10px;
+}
+
+.agent-view-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Ladder */
+
+.ladder {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rung {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-raised);
+}
+
+.rung::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--pending);
+}
+
+.rung-pass::before {
+  background: var(--pass);
+  box-shadow: 0 0 0 3px rgba(47, 216, 137, 0.18);
+}
+
+.rung-fail::before {
+  background: var(--fail);
+  box-shadow: 0 0 0 3px rgba(255, 92, 108, 0.18);
+}
+
+.rung > span:first-of-type {
+  font-weight: 700;
+  font-size: 13px;
+  min-width: 64px;
+}
+
+.rung-pass {
+  border-color: rgba(47, 216, 137, 0.35);
+}
+
+.rung-fail {
+  border-color: rgba(255, 92, 108, 0.35);
+}
+
+.failure-mode {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.rung-fail .failure-mode {
+  color: var(--fail);
+  border-color: rgba(255, 92, 108, 0.35);
+}
+
+.rung-pass .failure-mode {
+  color: var(--pass);
+  border-color: rgba(47, 216, 137, 0.35);
+}
+
+.self-report {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.self-report-mismatch {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+/* Trace log */
+
+.trace-log {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 260px;
+  overflow-y: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trace-log li {
+  padding: 3px 8px;
+  border-radius: 4px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trace-log li:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.trace-event-click {
+  color: var(--accent);
+}
+
+.trace-event-input {
+  color: #b39dff;
+}
+
+.trace-event-nav {
+  color: #4fd1c5;
+}
+
+.trace-event-dom_mutation {
+  color: var(--warn);
+}
+
+.trace-event-level_start,
+.trace-event-level_end {
+  color: var(--muted);
+  font-weight: 700;
+}

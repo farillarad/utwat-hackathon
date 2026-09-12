@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import CheckoutForm, { type OrderResult } from "../components/CheckoutForm";
 import OrderConfirmation from "../components/OrderConfirmation";
+import LevelProgress from "../components/LevelProgress";
 import { logEvent } from "../instrumentation/eventLogger";
 
 // Owner: Georgio (stretch) — an upsell dark pattern, not a visual-identity test.
@@ -22,6 +23,7 @@ export default function Level3Decoy() {
 
   return (
     <main>
+      <LevelProgress current={3} />
       <h1>Checkout</h1>
       {result ? (
         <OrderConfirmation level={3} result={result} onRetry={() => setResult(null)} />

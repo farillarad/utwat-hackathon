@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import CheckoutForm, { type OrderResult } from "../components/CheckoutForm";
 import OrderConfirmation from "../components/OrderConfirmation";
+import LevelProgress from "../components/LevelProgress";
 import { logEvent } from "../instrumentation/eventLogger";
 
 // Owner: Georgio — cookie banner, modal, sticky promo bar as non-blocking distractors.
@@ -36,6 +37,7 @@ export default function Level2Distractors() {
         🔥 Flash sale — ends in {formatCountdown(secondsLeft)}
       </div>
       <main>
+        <LevelProgress current={2} />
         <h1>Checkout</h1>
         {result ? (
           <OrderConfirmation level={2} result={result} onRetry={() => setResult(null)} />

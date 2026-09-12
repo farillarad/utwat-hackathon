@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import CheckoutForm from "../components/CheckoutForm";
+import LevelProgress from "../components/LevelProgress";
 import { logEvent } from "../instrumentation/eventLogger";
 
 // Owner: Tanay. Shift trigger: the submit button's own pointerenter — the moment
@@ -31,8 +32,10 @@ export default function Level4DomShift() {
 
   return (
     <main>
+      <LevelProgress current={4} />
       <h1>Checkout</h1>
       <div
+        className={shifted ? "dom-shift-flash" : undefined}
         style={
           shifted ? { transform: "translateY(40px)", transition: "transform 0.15s" } : undefined
         }
