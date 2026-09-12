@@ -7,10 +7,10 @@ export type LevelOutcome =
 
 export interface LevelResult {
   level: number;
-  outcome: "completed" | "failed"; // ground truth, per PRD §7 — decoupled from the classifier label
-  failure_mode: LevelOutcome | null;
+  outcome: "completed" | "failed"; // ground truth (PRD §7)
+  failure_mode: LevelOutcome | null; // classifier label, null if completed
   duration_s: number;
-  retries?: number;
+  retries: number; // attempts before this result
   // Did the agent itself believe it succeeded? null until the agent reports (or
   // never reports) its own belief. Comparing this to `outcome` is what makes the
   // Level 5 "assumed success incorrectly" story visible on the scoreboard instead

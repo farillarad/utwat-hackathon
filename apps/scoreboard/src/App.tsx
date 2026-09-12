@@ -1,123 +1,52 @@
-import { useEffect, useRef, useState } from "react";
-import TransitLine, { LEVEL_COUNT } from "./components/TransitLine";
-import FailureHero from "./components/FailureHero";
-import AgentPanel from "./components/AgentPanel";
-import TraceLog from "./components/TraceLog";
+import RunLane from "./components/RunLane";
 import { useRunStream } from "./ws/useRunStream";
 
-// Ladder Score per PRD §10: highest level cleanly completed x10, minus a
-// per-level-capped retry penalty summed across completed levels.
-function ladderScore(levels: { level: number; outcome: string; retries?: number }[]) {
-  const completed = levels.filter((l) => l.outcome === "completed");
-  const highest = completed.reduce((max, l) => Math.max(max, l.level), 0);
-  const retryPenalty = completed.reduce((sum, l) => sum + Math.min(5, l.retries ?? 0), 0);
-  return highest * 10 - retryPenalty;
-}
-
-// Animates the displayed score counting up (or down) to a new value instead of
-// snapping instantly. Purely a display effect — the score itself is still
-// computed by ladderScore() above with no change to that logic.
-function useCountUp(value: number, duration = 500) {
-  const [display, setDisplay] = useState(value);
-  const fromRef = useRef(value);
-
-  useEffect(() => {
-    const from = fromRef.current;
-    if (from === value) return;
-    const start = performance.now();
-    let raf: number;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      const next = Math.round(from + (value - from) * eased);
-      setDisplay(next);
-      if (t < 1) {
-        raf = requestAnimationFrame(tick);
-      } else {
-        fromRef.current = value;
-      }
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [value, duration]);
-
-  return display;
-}
+const MAX_LANES = 2;
 
 export default function App() {
-  const { levels, events } = useRunStream();
-  const score = useCountUp(ladderScore(levels));
-  const maxScore = LEVEL_COUNT * 10;
-
-  const passCount = levels.filter((l) => l.outcome === "completed").length;
-  const failCount = levels.filter((l) => l.outcome === "failed").length;
-  const totalDuration = levels.reduce((sum, l) => sum + (l.duration_s ?? 0), 0);
-  const failureModeCounts = levels.reduce<Record<string, number>>((acc, l) => {
-    if (l.failure_mode) acc[l.failure_mode] = (acc[l.failure_mode] ?? 0) + 1;
-    return acc;
-  }, {});
-  const firstFailure = levels.find((l) => l.outcome === "failed");
+  const { runs, connection, dismiss, clearAll } = useRunStream();
+  // Newest runs win the screen; older ones are still in memory and reappear when a lane is dismissed.
+  const visible = runs.slice(-MAX_LANES);
 
   return (
-    <div className="scoreboard">
-      <header className="scoreboard-header">
-        <div>
-          <div className="scoreboard-kicker">Agent Stress-Test</div>
-          <div className="scoreboard-title">Gauntlet</div>
+    <div className="board">
+      <header className="board__head">
+        <div className="board__title">
+          <span className="board__eyebrow">Agent stress-test</span>
+          <h1>Gauntlet</h1>
         </div>
-        <div className="score-block">
-          <div className="score-label">Ladder Score</div>
-          <div className="score-value">
-            {score}
-            <span className="score-max">/{maxScore}</span>
-          </div>
+        <div className="board__status">
+          <span className={`pill pill--${connection}`}>
+            <i className="pill__dot" />
+            {connection === "live" ? "Live feed" : connection === "connecting" ? "Connecting" : "Feed offline"}
+          </span>
+          <span className="board__count">
+            {runs.length === 0 ? "No runs" : `${runs.length} run${runs.length === 1 ? "" : "s"}`}
+          </span>
+          {runs.length > 0 && (
+            <button className="btn" onClick={clearAll}>
+              Clear board
+            </button>
+          )}
         </div>
       </header>
 
-      <div className="stats-strip">
-        <div className="stat">
-          <span className="stat-value">{passCount}</span>
-          <span className="stat-label">Passed</span>
-        </div>
-        <div className="stat stat-danger">
-          <span className="stat-value">{failCount}</span>
-          <span className="stat-label">Failed</span>
-        </div>
-        <div className="stat">
-          <span className="stat-value">
-            {levels.length}/{LEVEL_COUNT}
-          </span>
-          <span className="stat-label">Attempted</span>
-        </div>
-        <div className="stat">
-          <span className="stat-value">{totalDuration.toFixed(1)}s</span>
-          <span className="stat-label">Total Time</span>
-        </div>
-        {Object.entries(failureModeCounts).map(([mode, count]) => (
-          <div className="stat stat-tag" key={mode}>
-            <span className="stat-value">{count}×</span>
-            <span className="stat-label">{mode}</span>
-          </div>
-        ))}
-      </div>
-
-      <section className="panel transit-panel">
-        <h2 className="panel-title">Run Progress</h2>
-        <TransitLine levels={levels} />
-      </section>
-
-      {firstFailure && <FailureHero result={firstFailure} events={events} />}
-
-      <div className="lower-grid">
-        <section className="panel">
-          <h2 className="panel-title">Agent</h2>
-          <AgentPanel levels={levels} events={events} />
+      {visible.length === 0 ? (
+        <section className="empty">
+          <p className="empty__lead">Waiting for an agent to start a run.</p>
+          <p className="empty__hint">
+            Point an adapter at the gauntlet: <code>python agent-adapter/raw_llm_loop.py</code> or{" "}
+            <code>python agent-adapter/browser_use_runner.py</code>. To replay a stored run:{" "}
+            <code>npx tsx scripts/replay-run.ts data/runs/&lt;file&gt;.json</code>
+          </p>
         </section>
-        <section className="panel">
-          <h2 className="panel-title">Trace</h2>
-          <TraceLog events={events} />
-        </section>
-      </div>
+      ) : (
+        <main className="lanes" data-lanes={visible.length}>
+          {visible.map((run) => (
+            <RunLane key={run.run_id} run={run} onDismiss={() => dismiss(run.run_id)} />
+          ))}
+        </main>
+      )}
     </div>
   );
 }
