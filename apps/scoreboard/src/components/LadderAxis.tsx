@@ -124,6 +124,9 @@ function AxisRow({ run, label, selected, isLeader, showLeader, replay, reducedMo
               ×
             </button>
           </div>
+          <span className="axis__runner-id">
+            #{run.run_id.slice(0, 6)} · {run.events.length} evt
+          </span>
           <span className="axis__runner-stats">
             <strong>{passCount}</strong> passed
             <strong className="axis__runner-stats-fail">{failCount}</strong> failed
@@ -224,7 +227,7 @@ export default function LadderAxis({ runs, selectedRunId, replay, onSelect, onDi
   const topScore = sorted.reduce((best, r) => Math.max(best, ladderScore(r.levels).score), 0);
 
   return (
-    <div className="axis" ref={containerRef}>
+    <div className="axis panel panel--chamfer" ref={containerRef}>
       <div className="axis__header">
         <span className="axis__runner-col" aria-hidden />
         <span className="axis__score-col" aria-hidden />

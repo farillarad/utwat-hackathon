@@ -27,7 +27,7 @@ export default function FailureHero({ result, events, runName }: Props) {
   const mismatch = hasSelfReport && selfReport !== (result.outcome === "completed");
 
   return (
-    <section className="failure-hero" aria-live="polite">
+    <section className="failure-hero panel panel--chamfer" aria-live="polite">
       <div className="failure-hero-head">
         <span className="failure-hero-kicker">
           {runName} · run severed — Level {result.level}

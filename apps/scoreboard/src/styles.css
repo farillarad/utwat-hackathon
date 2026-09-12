@@ -1,25 +1,54 @@
-/* Gauntlet scoreboard — control-room timing board, read from across a room.
-   Color discipline: one hot accent (--live, amber) for general emphasis;
-   --fail is the single most saturated color on the page, reserved for the
-   failure itself; --pass is deliberately desaturated so it reads as "cleared"
-   rather than competing with the failure for attention. */
+/* Gauntlet scoreboard — diagnostic-instrument visual language: aerospace
+   telemetry / trading-terminal density, not game UI. Machined, technical,
+   slightly cold. One accent color, a strict saturation hierarchy
+   (fail > accent > pass > idle), two type voices (condensed display for
+   names/labels, monospace for every number and machine output).
+
+   TOKENS (the only colors/radii/fonts anything below may reference):
+     Surfaces:  --bg-base, --bg-panel, --bg-inset, --hairline, --hairline-soft
+     Text:      --text-primary, --text-secondary, --text-dim
+     Status:    --accent (amber, the only warm highlight), --pass, --fail,
+                --fail-dim, --idle
+     Radius:    --radius-sm, --radius-md
+     Type:      --display, --mono, --body */
 
 :root {
-  --bg: #0f141b;
-  --panel: #171d26;
-  --panel-2: #1e2631;
-  --line: #2b3542;
-  --text: #e9edf2;
-  --muted: #8a95a5;
-  --pass: #7fa08f;
-  --fail: #ff3b30;
-  --fail-dim: #7a4642;
-  --live: #ffc65c;
-  --pending: #3a4452;
+  /* Surfaces — near-black, slightly cool, three steps */
+  --bg-base: #0a0b0d;
+  --bg-panel: #131417;
+  --bg-inset: #08090a;
+  --hairline: rgba(255, 255, 255, 0.1);
+  --hairline-soft: rgba(255, 255, 255, 0.06);
 
-  --display: "Barlow Condensed", "Arial Narrow", sans-serif;
-  --body: "Barlow", system-ui, sans-serif;
+  /* Text — three clearly distinct steps */
+  --text-primary: #e7e8ea;
+  --text-secondary: #9a9ea6;
+  --text-dim: #5c6066;
+
+  /* Status — saturation hierarchy: fail > accent > pass > idle */
+  --accent: #e0a542;
+  --pass: #7d9686;
+  --fail: #ff3b30;
+  --fail-dim: #6b433f;
+  --idle: #35373b;
+
+  /* Per-run identity tags (trace log source chips) — deliberately a
+     separate category from the status tokens above: identity, not status,
+     so they sit at roughly 40% of a "normal" chip's saturation and never
+     compete with fail/accent/pass. */
+  --tag-a: #7891a3;
+  --tag-b: #a08b78;
+  --tag-c: #8f87a0;
+  --tag-d: #7a9a92;
+
+  /* Radius — sharp, not the generic-UI rounded-slate look */
+  --radius-sm: 2px;
+  --radius-md: 3px;
+
+  /* Type — two voices only; body prose falls back to the system sans */
+  --display: "Archivo Condensed", "Arial Narrow", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --body: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 *,
@@ -36,8 +65,8 @@ body,
 }
 
 body {
-  background: var(--bg);
-  color: var(--text);
+  background: var(--bg-base);
+  color: var(--text-primary);
   font-family: var(--body);
   font-size: 15px;
   line-height: 1.4;
@@ -45,7 +74,8 @@ body {
   position: relative;
 }
 
-/* One texture layer — faint scanlines to break up the flat fills. */
+/* One texture layer — faint scanlines to break up the flat fills. Applied
+   globally, once, never re-declared per panel. */
 body::before {
   content: "";
   position: fixed;
@@ -78,9 +108,9 @@ h3 {
 code {
   font-family: var(--mono);
   font-size: 0.85em;
-  background: var(--panel-2);
+  background: var(--bg-inset);
   padding: 0.1em 0.4em;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 button {
@@ -89,18 +119,50 @@ button {
 
 button:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid var(--live);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* ---- Board frame ---------------------------------------------------- */
+/* ---- Panel material ---------------------------------------------------
+   Every panel on the board shares this recipe: near-black base, a hairline
+   border, a 1px inner top highlight so it reads as a physical plate, sharp
+   corners, and no drop shadow — separation comes from border/value
+   contrast, not elevation. .panel--chamfer cuts the two "major panel"
+   corners for the instrument-panel look; smaller panels stay plain. */
+.panel {
+  position: relative;
+  background: var(--bg-panel);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+}
+
+.panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 1px;
+  right: 1px;
+  height: 1px;
+  background: var(--hairline-soft);
+  pointer-events: none;
+}
+
+.panel--chamfer {
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}
+
+.panel--inset {
+  background: var(--bg-inset);
+}
+
+/* ---- Board frame ------------------------------------------------------- */
 
 .board {
   height: 100%;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  padding: 18px 24px 24px;
-  gap: 16px;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  padding: 14px 20px 20px;
+  gap: 12px;
   overflow: hidden; /* header stays pinned; .comparison below scrolls itself if needed */
 }
 
@@ -108,90 +170,119 @@ button:focus-visible,
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--hairline);
 }
 
 .board__eyebrow {
   display: block;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--muted);
+  letter-spacing: 0.16em;
+  color: var(--text-dim);
 }
 
 .board__title h1 {
-  font-size: 34px;
+  font-size: 30px;
   line-height: 1;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
 }
 
-.board__status {
+.board__actions {
   display: flex;
   align-items: center;
-  gap: 14px;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font-family: var(--mono);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text);
-}
-
-.pill__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--pending);
-}
-
-/* Static, not pulsing — "live" is already conveyed by the label text, and
-   an idle loop here would be exactly the ambient motion this board avoids. */
-.pill--live .pill__dot {
-  background: var(--pass);
-  box-shadow: 0 0 0 3px rgba(127, 160, 143, 0.25);
-}
-
-.pill--connecting .pill__dot {
-  background: var(--live);
-}
-
-.pill--offline .pill__dot {
-  background: var(--fail);
+  gap: 10px;
 }
 
 .btn {
-  color: var(--text);
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 13px;
+  color: var(--text-secondary);
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
   cursor: pointer;
 }
 
 .btn:hover {
-  border-color: var(--muted);
+  border-color: var(--text-dim);
+  color: var(--text-primary);
 }
 
 .btn--quiet {
   background: transparent;
-  color: var(--muted);
 }
 
-/* ---- Empty state ---------------------------------------------------- */
+/* ---- Status bar ---------------------------------------------------------
+   Session-level readouts in a thin instrument-silkscreen strip — dead
+   space becomes information instead of a decorative pill. */
+
+.statusbar {
+  display: flex;
+  align-items: stretch;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.statusbar__seg {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 12px;
+  border-right: 1px solid var(--hairline);
+  white-space: nowrap;
+}
+
+.statusbar__seg:first-child {
+  padding-left: 0;
+}
+
+.statusbar__seg:last-child {
+  border-right: none;
+  margin-left: auto;
+}
+
+.statusbar__label {
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.statusbar__value {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.statusbar__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--idle);
+  flex-shrink: 0;
+}
+
+.statusbar__seg--live .statusbar__dot {
+  background: var(--pass);
+}
+
+.statusbar__seg--connecting .statusbar__dot {
+  background: var(--accent);
+}
+
+.statusbar__seg--offline .statusbar__dot {
+  background: var(--fail);
+}
+
+.statusbar__seg--live .statusbar__value {
+  color: var(--text-primary);
+}
+
+/* ---- Empty state --------------------------------------------------------- */
 
 .empty {
   display: grid;
@@ -203,54 +294,54 @@ button:focus-visible,
   gap: 10px;
   text-align: center;
   max-width: 62ch;
-  padding: 28px 32px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--panel);
-  color: var(--muted);
+  padding: 26px 30px;
+  color: var(--text-secondary);
 }
 
 .empty__status {
   justify-self: center;
   font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.14em;
+  font-size: 10px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--live);
-  border: 1px solid rgba(255, 198, 92, 0.4);
-  border-radius: 999px;
+  color: var(--accent);
+  border: 1px solid rgba(224, 165, 66, 0.4);
+  border-radius: var(--radius-sm);
   padding: 3px 10px;
 }
 
 .empty__lead {
   margin: 0;
   font-family: var(--display);
-  font-size: 28px;
-  color: var(--text);
+  font-size: 24px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
 }
 
 .empty__hint {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
 }
 
-/* ---- Comparison board ------------------------------------------------
+/* ---- Comparison board ---------------------------------------------------
    One shared surface for every run instead of N full dashboard clones:
-   one score readout, one ladder axis, one detail pane, one trace log. */
+   one ladder axis, one detail pane, one trace log. */
 
 .comparison {
   display: grid;
-  grid-template-rows: auto auto auto auto;
-  gap: 16px;
+  grid-template-rows: auto auto auto;
+  gap: 12px;
   min-height: 0;
-  /* With up to 4 rows, score+axis+detail+trace can exceed the viewport even
-     though each individual piece is compact. Scroll the whole surface rather
-     than silently clipping content the way a fixed-height, overflow:hidden
-     board would — the header above stays pinned since it's outside this. */
+  /* With up to 4 rows, axis+detail+trace can exceed the viewport even
+     though each individual piece is compact. Scroll the whole surface
+     rather than silently clipping content the way a fixed-height,
+     overflow:hidden board would — the header above stays pinned since
+     it's outside this. */
   overflow-y: auto;
 }
 
-/* ---- Shared ladder axis ------------------------------------------------
+/* ---- Shared ladder axis --------------------------------------------------
    Levels 1-6 are fixed, equal-width columns spanning the full width; every
    run is a row plotted against that same axis, so a run dying at L5 and one
    stalling at L2 read as different positions on one shared scale — not two
@@ -258,11 +349,8 @@ button:focus-visible,
 
 .axis {
   display: grid;
-  gap: 4px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 12px 18px 6px;
+  gap: 2px;
+  padding: 10px 20px 6px 16px;
 }
 
 .axis__header {
@@ -271,7 +359,7 @@ button:focus-visible,
   gap: 16px;
   padding-bottom: 8px;
   margin-bottom: 4px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--hairline);
 }
 
 .axis__track--header {
@@ -284,9 +372,9 @@ button:focus-visible,
   top: 0;
   transform: translateX(-50%);
   font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
 }
 
 /* Split into an outer (position/selection chrome) and an inner (grid layout)
@@ -296,18 +384,16 @@ button:focus-visible,
 .axis__row {
   padding: 8px 8px 8px 12px;
   margin: 0 -8px;
-  border-radius: 8px;
   border-left: 3px solid transparent;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .axis__row:not(:last-child) {
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--hairline);
 }
 
 .axis__row:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.025);
 }
 
 .axis__row-inner {
@@ -340,20 +426,21 @@ button:focus-visible,
   }
 }
 
-/* Selection needs to be unambiguous at a glance: accent border + tinted
-   background on the row, not just a subtle tone shift. */
+/* Selected: a solid accent edge plus a raised (neutral, not colored) panel
+   value — a broad amber wash would compete with the failure marker for
+   attention, which is exactly what this avoids. */
 .axis__row--selected {
-  background: rgba(255, 198, 92, 0.08);
-  border-left-color: var(--live);
+  background: rgba(255, 255, 255, 0.035);
+  border-left-color: var(--accent);
 }
 
 .axis__row--selected:hover {
-  background: rgba(255, 198, 92, 0.11);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .axis__runner {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -366,35 +453,46 @@ button:focus-visible,
 
 .axis__runner-name {
   font-family: var(--display);
-  font-size: 19px;
+  font-size: 18px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.02em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text-primary);
 }
 
 .axis__leader {
-  color: var(--live);
+  color: var(--accent);
   margin-right: 4px;
-  font-size: 15px;
+  font-size: 13px;
+}
+
+/* Silkscreen micro-label: run id + event count, dim mono, purely
+   informational density rather than decoration. */
+.axis__runner-id {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
 }
 
 .axis__dismiss {
-  color: var(--muted);
+  color: var(--text-dim);
   background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  width: 20px;
-  height: 20px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  width: 18px;
+  height: 18px;
   line-height: 1;
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .axis__dismiss:hover {
-  color: var(--text);
-  border-color: var(--muted);
+  color: var(--text-primary);
+  border-color: var(--text-dim);
 }
 
 .axis__runner-stats {
@@ -402,12 +500,12 @@ button:focus-visible,
   flex-wrap: wrap;
   gap: 4px 10px;
   font-family: var(--mono);
-  font-size: 11px;
-  color: var(--muted);
+  font-size: 10.5px;
+  color: var(--text-dim);
 }
 
 .axis__runner-stats strong {
-  color: var(--text);
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
@@ -423,23 +521,24 @@ button:focus-visible,
 }
 
 .axis__score-value {
-  font-family: var(--display);
+  font-family: var(--mono);
   font-weight: 700;
-  font-size: 24px;
+  font-size: 22px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
 }
 
 .axis__score-max {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  color: var(--muted);
+  color: var(--text-dim);
 }
 
 .axis__score-detail {
   font-family: var(--mono);
-  font-size: 10px;
-  color: var(--muted);
+  font-size: 9.5px;
+  color: var(--text-dim);
 }
 
 .axis__track {
@@ -447,29 +546,36 @@ button:focus-visible,
   height: 34px;
 }
 
+/* Idle track: a low-contrast dotted line (not a mid-gray dash) plus a faint
+   fixed-period tick pattern, like a measurement scale. */
 .axis__rail {
   position: absolute;
   top: 50%;
   left: 0;
   right: 0;
-  height: 2px;
+  height: 3px;
   transform: translateY(-50%);
-  background-image: repeating-linear-gradient(to right, var(--pending) 0 5px, transparent 5px 9px);
+  background-image: repeating-linear-gradient(to right, var(--idle) 0 1.5px, transparent 1.5px 7px),
+    repeating-linear-gradient(to right, var(--hairline) 0 1px, transparent 1px 22px);
+  opacity: 0.9;
 }
 
+/* Reached track: a double line (two 1px rules with a gap) so it reads as a
+   track/bus rather than a plain filled bar. */
 .axis__rail-fill {
   position: absolute;
   top: 50%;
   left: 0;
-  height: 2px;
+  height: 3px;
   transform: translateY(-50%);
-  background: var(--pass);
+  background: linear-gradient(var(--pass), var(--pass)) 0 0 / 100% 1px no-repeat,
+    linear-gradient(var(--pass), var(--pass)) 0 100% / 100% 1px no-repeat;
   transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Flat and desaturated by default — only the selected run's severance
-   marker (below) gets full saturation and the glow. Unselected failures are
-   still visible, just not competing for attention. */
+   marker (below) gets full saturation. Unselected failures are still
+   visible, just not competing for attention. */
 .axis__break {
   position: absolute;
   top: 50%;
@@ -521,8 +627,7 @@ button:focus-visible,
   transform: translate(-50%, -50%);
   width: 3px;
   height: 18px;
-  background: var(--muted);
-  border-radius: 2px;
+  background: var(--text-dim);
 }
 
 .axis__endcap-label {
@@ -534,7 +639,7 @@ button:focus-visible,
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--muted);
+  color: var(--text-dim);
   white-space: nowrap;
 }
 
@@ -547,10 +652,9 @@ button:focus-visible,
   top: calc(50% - 16px);
   width: 8px;
   height: 8px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: var(--live);
-  box-shadow: 0 0 6px 1px rgba(255, 198, 92, 0.7);
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: var(--accent);
+  box-shadow: 0 0 6px 1px rgba(224, 165, 66, 0.6);
 }
 
 /* Hits a severance: flares once and holds (no bounce, no loop). */
@@ -562,13 +666,13 @@ button:focus-visible,
 
 @keyframes axis-pip-flare {
   0% {
-    transform: translate(-50%, -50%) scale(1);
+    transform: translate(-50%, -50%) rotate(45deg) scale(1);
   }
   40% {
-    transform: translate(-50%, -50%) scale(2.2);
+    transform: translate(-50%, -50%) rotate(45deg) scale(2.2);
   }
   100% {
-    transform: translate(-50%, -50%) scale(1);
+    transform: translate(-50%, -50%) rotate(45deg) scale(1);
   }
 }
 
@@ -586,6 +690,9 @@ button:focus-visible,
   }
 }
 
+/* Nodes are geometric and shape-distinct by stage, not just color-distinct
+   — the board should still read correctly in grayscale. Base shape is a
+   plain square (locked/idle); pass/current/fail override the shape below. */
 .axis__node {
   position: absolute;
   top: 50%;
@@ -593,28 +700,31 @@ button:focus-visible,
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
+  width: 20px;
+  height: 20px;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  background: var(--panel-2);
-  border: 2px solid var(--pending);
-  color: var(--muted);
-  transition: all 0.4s ease;
+  background: var(--bg-inset);
+  border: 1.5px solid var(--idle);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
 .axis__node--locked {
-  opacity: 0.4;
+  opacity: 0.55;
 }
 
-/* Static while it stays "current" — it only animates in once, the instant
-   the agent's position moves onto it (see .axis__node--current-enter). */
+/* Hexagon — the agent's current position while a run is live. Static; it
+   only animates in once, the instant the position moves onto it (see
+   .axis__node--current-enter). */
 .axis__node--current {
-  border-color: var(--live);
-  color: var(--live);
-  background: rgba(255, 198, 92, 0.15);
+  clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0% 50%);
+  border-radius: 0;
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(224, 165, 66, 0.15);
 }
 
 .axis__node--current-enter {
@@ -632,71 +742,76 @@ button:focus-visible,
   }
 }
 
+/* Circle with a filled core — passed. */
 .axis__node--pass {
+  border-radius: 50%;
   border-color: var(--pass);
   color: var(--pass);
-  background: rgba(127, 160, 143, 0.14);
+  background: radial-gradient(circle, var(--pass) 0 3px, rgba(125, 150, 134, 0.14) 4px);
 }
 
-/* Full saturation + glow: only the selected run's failure looks like this. */
+/* Diamond (via clip-path, not rotation, so the glyph inside stays upright)
+   — full saturation + glow only for the selected run's failure. */
 .axis__node--fail {
-  width: 30px;
-  height: 30px;
-  font-size: 14px;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  border-radius: 0;
+  width: 28px;
+  height: 28px;
+  font-size: 13px;
   border-color: var(--fail);
   background: var(--fail);
-  color: #1a0906;
+  color: var(--bg-base);
   box-shadow: 0 0 0 6px rgba(255, 59, 48, 0.15), 0 0 20px rgba(255, 59, 48, 0.55);
 }
 
-/* Flat and desaturated: every other run's failure, so exactly one marker on
-   the board reads as "the finding," not all of them at once. */
+/* Same diamond shape, flat and desaturated: every other run's failure, so
+   exactly one marker on the board reads as "the finding." */
 .axis__node--fail-dim {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  border-radius: 0;
   border-color: var(--fail-dim);
   color: var(--fail-dim);
-  background: rgba(122, 70, 66, 0.14);
+  background: rgba(107, 67, 63, 0.18);
 }
 
-/* ---- Replay controls --------------------------------------------------- */
+/* ---- Replay controls ------------------------------------------------------ */
 
 .replay {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 14px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  padding: 7px 14px;
 }
 
 .replay__btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  color: var(--text);
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  font-size: 13px;
+  width: 26px;
+  height: 26px;
+  color: var(--text-secondary);
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
   line-height: 1;
   cursor: pointer;
 }
 
 .replay__btn:hover:not(:disabled) {
-  border-color: var(--muted);
+  border-color: var(--text-dim);
+  color: var(--text-primary);
 }
 
 .replay__btn:disabled {
-  color: var(--muted);
+  color: var(--text-dim);
   cursor: not-allowed;
   opacity: 0.5;
 }
 
 .replay__scrub {
   flex: 1;
-  accent-color: var(--live);
+  accent-color: var(--accent);
 }
 
 .replay__scrub:disabled {
@@ -705,8 +820,8 @@ button:focus-visible,
 
 .replay__time {
   font-family: var(--mono);
-  font-size: 11px;
-  color: var(--muted);
+  font-size: 10.5px;
+  color: var(--text-dim);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -719,17 +834,17 @@ button:focus-visible,
 .replay__speed {
   padding: 3px 8px;
   font-family: var(--mono);
-  font-size: 11px;
-  color: var(--muted);
+  font-size: 10.5px;
+  color: var(--text-dim);
   background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
 .replay__speed:hover:not(:disabled) {
-  border-color: var(--muted);
-  color: var(--text);
+  border-color: var(--text-dim);
+  color: var(--text-primary);
 }
 
 .replay__speed:disabled {
@@ -738,18 +853,18 @@ button:focus-visible,
 }
 
 .replay__speed--active {
-  color: var(--bg);
-  background: var(--live);
-  border-color: var(--live);
+  color: var(--bg-base);
+  background: var(--accent);
+  border-color: var(--accent);
   font-weight: 700;
 }
 
-/* ---- Selection detail row: video feed | failure hero ------------------- */
+/* ---- Selection detail row: video feed | failure hero -------------------- */
 
 .comparison__detail {
   display: grid;
   grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
-  gap: 16px;
+  gap: 12px;
   align-items: start;
 }
 
@@ -757,32 +872,29 @@ button:focus-visible,
   grid-column: 1 / -1;
 }
 
-/* ---- Browser view --------------------------------------------------- */
+/* ---- Browser / breakdown view -------------------------------------------- */
 
 .browser {
   margin: 0;
-  border: 1px solid var(--line);
-  border-radius: 10px;
   overflow: hidden;
-  background: #0b0f14;
 }
 
 .browser__chrome {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
-  background: var(--panel-2);
-  border-bottom: 1px solid var(--line);
+  padding: 7px 12px;
+  background: var(--bg-inset);
+  border-bottom: 1px solid var(--hairline);
   font-family: var(--mono);
-  font-size: 12px;
-  color: var(--muted);
+  font-size: 11px;
+  color: var(--text-dim);
 }
 
 .browser__dots {
-  width: 34px;
-  height: 8px;
-  background: radial-gradient(circle at 4px 4px, var(--pending) 3px, transparent 3.5px) 0 0 / 13px 8px repeat-x;
+  width: 30px;
+  height: 6px;
+  background: radial-gradient(circle at 3px 3px, var(--idle) 2.5px, transparent 3px) 0 0 / 11px 6px repeat-x;
 }
 
 .browser__url {
@@ -793,10 +905,10 @@ button:focus-visible,
 }
 
 .browser__live {
-  color: var(--live);
+  color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  font-size: 10px;
+  font-size: 9px;
 }
 
 .browser__viewport {
@@ -806,8 +918,7 @@ button:focus-visible,
 }
 
 /* When showing the per-level breakdown instead of a frame, don't force it
-   into a centered blob inside an aspect-ratio box — that's what made this
-   panel read as a tall empty box in the first place. Let it fill the space
+   into a centered blob inside an aspect-ratio box. Let it fill the space
    top-to-bottom instead. */
 .browser__viewport--summary {
   aspect-ratio: auto;
@@ -825,68 +936,68 @@ button:focus-visible,
 .browser__empty {
   margin: 0;
   padding: 24px;
-  color: var(--muted);
+  color: var(--text-dim);
   text-align: center;
+  font-size: 13px;
 }
 
 .browser__summary {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   height: 100%;
-  padding: 16px 20px;
+  padding: 14px 18px;
 }
 
 .browser__summary-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--hairline);
 }
 
-.browser__summary-status {
+/* Instrument-panel silkscreen label — this panel IS the breakdown now,
+   not a "waiting for frame" placeholder, so its header says what it is. */
+.browser__summary-title {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
+  letter-spacing: 0.16em;
+  color: var(--text-dim);
 }
 
 .browser__summary-score {
-  font-family: var(--display);
+  font-family: var(--mono);
   font-weight: 700;
-  font-size: 30px;
+  font-size: 26px;
   line-height: 1;
-  color: var(--live);
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
 }
 
 .browser__summary-max {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
-  color: var(--muted);
+  color: var(--text-dim);
 }
 
-/* Per-level timing breakdown — fills the space a bare "waiting" placeholder
-   used to leave empty, and doubles as a quick per-level readout for the
-   selected run even once a frame is available for other runs. */
 .browser__breakdown {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 2px;
+  gap: 1px;
 }
 
 .browser__breakdown-row {
   display: grid;
-  grid-template-columns: 34px 56px 1fr;
+  grid-template-columns: 30px 52px 1fr;
   gap: 12px;
-  padding: 6px 8px;
-  border-radius: 4px;
+  padding: 5px 8px;
   font-family: var(--mono);
-  font-size: 12px;
-  color: var(--muted);
+  font-size: 11.5px;
+  color: var(--text-dim);
 }
 
 .browser__breakdown-row:nth-child(odd) {
@@ -894,7 +1005,7 @@ button:focus-visible,
 }
 
 .browser__breakdown-level {
-  color: var(--text);
+  color: var(--text-secondary);
   font-weight: 700;
 }
 
@@ -907,7 +1018,7 @@ button:focus-visible,
   font-weight: 700;
 }
 
-/* ---- Failure hero ------------------------------------------------------
+/* ---- Failure hero ---------------------------------------------------------
    The board's one failure detail panel, driven by whichever run is
    selected. Nothing else on the board uses --fail at this weight/scale. */
 
@@ -915,11 +1026,9 @@ button:focus-visible,
    run+level, so switching to a different failure remounts it and replays
    this once. Reduced motion turns it off below. */
 .failure-hero {
-  border: 1px solid rgba(255, 59, 48, 0.45);
-  background: linear-gradient(180deg, rgba(255, 59, 48, 0.1), rgba(255, 59, 48, 0.02));
-  border-radius: 10px;
-  padding: 16px 18px;
-  box-shadow: 0 0 0 1px rgba(255, 59, 48, 0.08), 0 10px 28px rgba(255, 59, 48, 0.12);
+  border-color: rgba(255, 59, 48, 0.4);
+  background: linear-gradient(180deg, rgba(255, 59, 48, 0.09), var(--bg-panel) 60%);
+  padding: 16px 20px;
   animation: failure-hero-enter 300ms ease-out;
 }
 
@@ -943,9 +1052,9 @@ button:focus-visible,
 
 .failure-hero-kicker {
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--fail);
 }
@@ -953,10 +1062,11 @@ button:focus-visible,
 .failure-hero-mode {
   margin: 0;
   font-family: var(--display);
-  font-size: 26px;
+  font-size: 25px;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-primary);
   text-transform: uppercase;
+  letter-spacing: 0.01em;
 }
 
 /* The core finding of the project: what the agent believed vs. what
@@ -967,37 +1077,37 @@ button:focus-visible,
   display: block;
   margin-bottom: 12px;
   padding: 10px 14px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--line);
-  font-size: 15px;
+  border: 1px solid var(--hairline);
+  font-size: 14px;
   font-weight: 500;
-  color: var(--text);
+  color: var(--text-primary);
 }
 
 .failure-hero-belief strong {
-  color: #fff;
+  color: var(--text-primary);
   font-weight: 700;
 }
 
 .failure-hero-belief[data-mismatch="true"] {
-  border-color: rgba(255, 198, 92, 0.55);
-  background: rgba(255, 198, 92, 0.08);
+  border-color: rgba(224, 165, 66, 0.5);
+  background: rgba(224, 165, 66, 0.08);
 }
 
 .failure-hero-belief[data-mismatch="true"] strong {
-  color: var(--live);
+  color: var(--accent);
 }
 
 .failure-hero-belief-tag {
   display: inline-block;
   margin-left: 8px;
   padding: 2px 8px;
-  border-radius: 4px;
-  background: var(--live);
-  color: var(--bg);
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--bg-base);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1005,8 +1115,8 @@ button:focus-visible,
 }
 
 .failure-hero-belief-pending {
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--text-dim);
+  font-size: 12.5px;
   font-weight: 400;
   font-style: italic;
 }
@@ -1014,13 +1124,13 @@ button:focus-visible,
 .failure-hero-trace {
   margin: 0;
   padding: 8px 10px;
-  background: #0b0f14;
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
   font-family: var(--mono);
   font-size: 11px;
   line-height: 1.6;
-  color: var(--muted);
+  color: var(--text-dim);
   white-space: pre-wrap;
   overflow-x: auto;
   /* Enough context to fill the card instead of leaving a gap below a short
@@ -1030,10 +1140,12 @@ button:focus-visible,
   overflow-y: auto;
 }
 
-/* ---- Trace log ------------------------------------------------------
+/* ---- Trace log -----------------------------------------------------------
    One merged, full-width log instead of one per run. Rows wrap instead of
    clipping — a narrow column truncating mid-word is exactly what this
-   replaces. */
+   replaces. Deliberately the driest-looking panel on the board: plain
+   monospace, no chamfer, no accent — the contrast with the instrumented
+   axis above is what sells the rest of it as "designed." */
 
 .trace {
   display: grid;
@@ -1041,10 +1153,8 @@ button:focus-visible,
   /* Fixed height (not "whatever's left") so the log always gets its own
      compact, internally-scrolling pane regardless of how many rows are
      above it — new events auto-scroll within this box, not the whole page. */
-  height: 280px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #0b0f14;
+  height: 260px;
+  background: var(--bg-inset);
   overflow: hidden;
 }
 
@@ -1053,12 +1163,12 @@ button:focus-visible,
   align-items: center;
   gap: 14px;
   padding: 6px 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--hairline);
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--muted);
+  letter-spacing: 0.16em;
+  color: var(--text-dim);
 }
 
 .trace__filters {
@@ -1069,20 +1179,20 @@ button:focus-visible,
 
 .trace__filter {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 9.5px;
   text-transform: none;
   letter-spacing: 0;
-  color: var(--muted);
+  color: var(--text-dim);
   background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 2px 9px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
   cursor: pointer;
 }
 
 .trace__filter:hover {
-  border-color: var(--muted);
-  color: var(--text);
+  border-color: var(--text-dim);
+  color: var(--text-primary);
 }
 
 .trace__filter.src-a,
@@ -1093,9 +1203,9 @@ button:focus-visible,
 }
 
 .trace__filter.trace__filter--active {
-  color: var(--bg);
-  background: var(--live);
-  border-color: var(--live);
+  color: var(--bg-base);
+  background: var(--accent);
+  border-color: var(--accent);
   font-weight: 700;
 }
 
@@ -1110,19 +1220,19 @@ button:focus-visible,
   padding: 6px 0;
   overflow-y: auto;
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: 12px;
 }
 
 .trace__row {
   display: grid;
   grid-template-columns: 150px 30px 66px 1fr;
   gap: 10px;
-  padding: 4px 12px;
-  color: var(--text);
+  padding: 3px 12px;
+  color: var(--text-secondary);
 }
 
 .trace__row:nth-child(even) {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.015);
 }
 
 /* Fades with age as rows scroll up — purely structural (nth-last-child), no
@@ -1162,49 +1272,51 @@ button:focus-visible,
   white-space: nowrap;
 }
 
+/* Per-run identity tags, not status — desaturated to roughly 40% of a
+   "normal" chip color so they never compete with pass/fail/accent. */
 .src-a {
-  color: #6fb3ff;
+  color: var(--tag-a);
 }
 
 .src-b {
-  color: #ff9f6e;
+  color: var(--tag-b);
 }
 
 .src-c {
-  color: #b39cff;
+  color: var(--tag-c);
 }
 
 .src-d {
-  color: #6fe0c9;
+  color: var(--tag-d);
 }
 
 .trace__level,
 .trace__ts {
-  color: var(--muted);
+  color: var(--text-dim);
 }
 
 .trace__what {
   overflow-wrap: anywhere;
+  color: var(--text-secondary);
 }
 
 .trace__row--level_start .trace__what,
 .trace__row--level_end .trace__what {
-  color: var(--live);
+  color: var(--accent);
 }
 
 .trace__row--dom_mutation .trace__what {
-  color: var(--muted);
+  color: var(--text-dim);
   font-style: italic;
 }
 
 .trace__empty {
   padding: 10px 12px;
-  color: var(--muted);
+  color: var(--text-dim);
 }
 
-/* ---- Motion --------------------------------------------------------- */
-
-/* "Keep instant state changes" means every transition on the board becomes
+/* ---- Motion ---------------------------------------------------------------
+   "Keep instant state changes" means every transition on the board becomes
    an instant snap, not just the three named in the brief (traversal, shake,
    stagger) — so this is a blanket rule, not a per-class list. Belt-and-
    suspenders on top of the JS: components already gate each new class
@@ -1228,7 +1340,11 @@ button:focus-visible,
   }
 
   .axis__header,
-  .axis__row {
+  .axis__row-inner {
     grid-template-columns: 140px 1fr;
+  }
+
+  .axis__score {
+    display: none;
   }
 }

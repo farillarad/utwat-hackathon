@@ -9,7 +9,7 @@ export default function ReplayControls({ replay }: { replay: ReplayState }) {
   const { isPlaying, speed, currentTime, totalTime, canPlay, play, pause, restart, setSpeed, seek } = replay;
 
   return (
-    <div className="replay" aria-label="Replay controls">
+    <div className="replay panel" aria-label="Replay controls">
       <button
         type="button"
         className="replay__btn"

@@ -65,7 +65,6 @@ export default function ComparisonBoard({ runs, onDismiss }: Props) {
         score: ladderScore(selectedRun.levels).score,
         maxScore: MAX_SCORE,
         levels: selectedRun.levels,
-        ended: selectedRun.ended,
       }
     : null;
 
