@@ -43,12 +43,12 @@ export default function CheckoutForm({
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label>
+    <form className="checkout-form" onSubmit={handleSubmit}>
+      <label className="field">
         Item
         <input value={item} readOnly />
       </label>
-      <label>
+      <label className="field">
         Quantity
         <input
           type="number"
@@ -61,7 +61,7 @@ export default function CheckoutForm({
         />
       </label>
       {showZip && (
-        <label>
+        <label className="field">
           Shipping ZIP
           <input
             value={zip}
@@ -84,7 +84,7 @@ export default function CheckoutForm({
           autoComplete="off"
         />
       )}
-      <button type="submit" id={submitButtonId}>
+      <button type="submit" id={submitButtonId} className="btn btn-primary">
         Complete order
       </button>
     </form>
