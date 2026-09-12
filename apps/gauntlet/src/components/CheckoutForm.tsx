@@ -32,7 +32,8 @@ interface CheckoutFormProps {
   getExtraItems?: (submitterId: string) => string[];
 }
 
-const API_URL = import.meta.env.VITE_INSTRUMENTATION_API ?? "http://localhost:4000";
+// Same-origin when served by the Express server (PRD v2 §7); localhost:4000 under Vite dev.
+const API_URL: string = import.meta.env.VITE_INSTRUMENTATION_API ?? (import.meta.env.DEV ? "http://localhost:4000" : "");
 
 export default function CheckoutForm({
   level,
