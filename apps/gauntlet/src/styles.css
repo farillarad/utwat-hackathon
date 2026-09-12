@@ -471,6 +471,162 @@ h1 {
   font-size: 14px;
 }
 
+/* Orders pages — "Your orders" and one order's detail. Plain and factual: this is
+   where the server's version of events is shown. */
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+}
+
+.order-row {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.order-row-rejected,
+.order-row-cancelled {
+  background: var(--bg);
+}
+
+.order-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.order-row-id {
+  font-weight: 700;
+}
+
+.order-row-id-none {
+  color: var(--muted);
+}
+
+.order-row p {
+  margin: 4px 0 0;
+}
+
+.order-row-summary {
+  font-weight: 600;
+}
+
+.order-row-reason {
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.order-row-meta {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.orders-empty,
+.orders-loading {
+  color: var(--muted);
+}
+
+.orders-error {
+  color: var(--accent);
+}
+
+.status-pill {
+  flex: none;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-pill-active {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.status-pill-cancelled {
+  background: #eceef2;
+  color: var(--muted);
+}
+
+.status-pill-rejected {
+  background: #fdf0ef;
+  color: var(--accent);
+}
+
+.order-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.order-detail-head h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.order-cancelled-note {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+
+.order-detail-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 20px;
+  margin: 0 0 24px;
+}
+
+.order-detail-list dt {
+  color: var(--muted);
+}
+
+.order-detail-list dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.order-detail-back {
+  margin: 24px 0 0;
+  font-size: 14px;
+}
+
+/* Dev-only level index (/levels, mock mode). */
+
+.level-index-note {
+  margin-top: -8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.level-index {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.level-index th,
+.level-index td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.level-index-mechanic {
+  white-space: nowrap;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+}
+
 /* Toast — success-looking, bottom right. */
 
 .toast {

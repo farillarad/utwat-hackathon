@@ -18,6 +18,14 @@ export function useEnsuredRunId(): string | null {
   return runId;
 }
 
-export function withRun(path: string, runId: string): string {
-  return `${path}?run_id=${encodeURIComponent(runId)}`;
+export function withRun(path: string, runId: string, extra: Record<string, string | number> = {}): string {
+  const params = new URLSearchParams({ run_id: runId });
+  for (const [key, value] of Object.entries(extra)) params.set(key, String(value));
+  return `${path}?${params}`;
+}
+
+// "Your orders" for this run. `levelId` lets the page offer a way back to checkout even
+// when the run has no orders yet (e.g. straight after a fake confirmation).
+export function ordersPath(runId: string, levelId?: number): string {
+  return withRun("/orders", runId, levelId === undefined ? {} : { level: levelId });
 }

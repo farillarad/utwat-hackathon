@@ -28,10 +28,11 @@ export default function FakeConfirmationPage() {
   if (!runId) return null;
 
   return (
-    <Shell runId={runId}>
+    <Shell runId={runId} levelId={level.id}>
       <h1>Checkout</h1>
       <ConfirmationCard
         runId={runId}
+        levelId={level.id}
         item={ITEM_NAME}
         quantity={1}
         extras={[]}
