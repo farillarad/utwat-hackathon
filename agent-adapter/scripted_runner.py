@@ -69,6 +69,8 @@ def main() -> int:
             time.sleep(1.0)
             frame()
 
+            # A naive agent believes whatever the page says.
+            client.self_report(run_id, level, "confirmed" in page.content().lower())
             result = client.wait_for_level_result(run_id, level)
             if result is None and submit.count():
                 # Stale click missed; a second, fresh click is the "recovered" path.

@@ -82,6 +82,9 @@ async def main() -> int:
             if history.final_result():
                 print(f"  final: {history.final_result()[:200]}")
 
+            # Browser Use's own verdict (its `done` action's success flag), independent of
+            # the ground truth the server computed from the actual order.
+            await asyncio.to_thread(client.self_report, run_id, level, bool(history.is_successful()))
             result = await asyncio.to_thread(client.wait_for_level_result, run_id, level)
             summary.levels.append(
                 LevelSummary(

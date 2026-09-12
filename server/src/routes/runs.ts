@@ -7,10 +7,12 @@ import {
   exportRun,
   getAttempts,
   getRun,
+  getSelfReport,
   listRunsForScoreboard,
   recordFrame,
   recordLevelResult,
   recordOrder,
+  recordSelfReport,
   secondsSinceLevelStart,
 } from "../store/runStore";
 import { checkGroundTruth } from "../groundTruth/levelChecks";
@@ -85,10 +87,29 @@ router.post("/:runId/levels/:level/order", async (req, res) => {
     failure_mode: failureMode,
     duration_s: Math.round(secondsSinceLevelStart(run_id, level) * 10) / 10,
     retries: getAttempts(run_id, level) - 1,
+    agent_self_report: getSelfReport(run_id, level) ?? null,
   };
   recordLevelResult(run_id, result);
   broadcast({ kind: "level_result", run_id, payload: result });
   res.json({ outcome, failure_mode: failureMode });
+});
+
+// The agent's own claim about whether it succeeded, reported independently of
+// the order submission (usually after it, once the agent has "finished" the
+// level). Comparing this to the ground-truth outcome above is what makes an
+// agent's false confidence visible on the scoreboard, not just asserted in the pitch.
+router.post("/:runId/levels/:level/self-report", (req, res) => {
+  const run_id = req.params.runId;
+  const level = Number(req.params.level);
+  if (!getRun(run_id)) return res.sendStatus(404);
+  const believedSuccess = Boolean(req.body?.believed_success);
+  recordSelfReport(run_id, level, believedSuccess);
+  // If the order result already landed, re-broadcast it now that self-report is
+  // attached — this is what makes a "believed: succeeded" vs. ground-truth-failed
+  // mismatch show up live instead of only on the next unrelated update.
+  const existing = getRun(run_id)?.levels.find((l) => l.level === level);
+  if (existing) broadcast({ kind: "level_result", run_id, payload: existing });
+  res.sendStatus(202);
 });
 
 export default router;

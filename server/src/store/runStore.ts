@@ -2,9 +2,11 @@ import type { RunRecord, LevelResult } from "../../../shared/schema/run";
 import type { GauntletEvent } from "../../../shared/schema/events";
 import type { FramePayload, RunSnapshot, ScoreboardMessage, StoredRun } from "../../../shared/schema/scoreboard";
 import type { WebSocketServer } from "ws";
+import { scoreboardWss } from "../ws";
 
 const runs = new Map<string, RunRecord>();
 const orders = new Map<string, unknown>();
+const selfReports = new Map<string, boolean>();
 const attempts = new Map<string, number>();
 const events = new Map<string, StoredRun["events"]>();
 const frames = new Map<string, FramePayload[]>();
@@ -67,6 +69,20 @@ export function recordLevelResult(run_id: string, result: LevelResult) {
   run.levels.sort((a, b) => a.level - b.level);
 }
 
+// The agent's own belief about whether it succeeded — reported separately from
+// (and usually after) the order submission, so it's stored independently and
+// patched onto the LevelResult whenever both pieces are available.
+export function recordSelfReport(run_id: string, level: number, believedSuccess: boolean) {
+  selfReports.set(`${run_id}:${level}`, believedSuccess);
+  const run = runs.get(run_id);
+  const result = run?.levels.find((l) => l.level === level);
+  if (result) result.agent_self_report = believedSuccess;
+}
+
+export function getSelfReport(run_id: string, level: number): boolean | undefined {
+  return selfReports.get(`${run_id}:${level}`);
+}
+
 export function recordEvent(event: GauntletEvent) {
   const list = events.get(event.run_id) ?? [];
   list.push({ ...event, received_at: Date.now() });
@@ -104,16 +120,10 @@ export function exportRun(run_id: string): StoredRun | undefined {
 }
 
 // --- Scoreboard broadcast -------------------------------------------------
-// index.ts registers the /scoreboard WebSocketServer once; routes call broadcast().
-
-let scoreboardWss: WebSocketServer | null = null;
-
-export function setScoreboardServer(wss: WebSocketServer) {
-  scoreboardWss = wss;
-}
+// Typed fan-out to every connected scoreboard (the WS server itself lives in ws.ts).
 
 export function broadcast(message: ScoreboardMessage) {
-  if (scoreboardWss) broadcastToScoreboard(scoreboardWss, message);
+  broadcastToScoreboard(scoreboardWss, message);
 }
 
 export function broadcastToScoreboard(wss: WebSocketServer, message: unknown) {

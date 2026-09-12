@@ -1,0 +1,333 @@
+/* Shared gauntlet design system — every level inherits these base styles, so
+   level pages only need plain <main>/<h1>/CheckoutForm to look like one shop. */
+
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --text: #1c1f24;
+  --muted: #5f6673;
+  --border: #d9dde3;
+  --primary: #2458e6;
+  --primary-hover: #1b47bf;
+  --accent: #e8453c;
+  --success: #1f8a4c;
+  --radius: 8px;
+  --shadow: 0 4px 16px rgba(20, 24, 31, 0.08);
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+main {
+  max-width: 480px;
+  margin: 48px auto;
+  padding: 32px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+h1 {
+  margin: 0 0 24px;
+  font-size: 28px;
+}
+
+/* Checkout form */
+
+.checkout-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.field input {
+  padding: 10px 12px;
+  font: inherit;
+  font-weight: 400;
+  font-size: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.field input:read-only {
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.field input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+/* Buttons */
+
+.btn {
+  padding: 12px 20px;
+  font: inherit;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+}
+
+.btn-secondary {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--bg);
+}
+
+/* Post-submit confirmation */
+
+.confirmation {
+  padding: 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.confirmation h2 {
+  margin: 0 0 12px;
+  font-size: 22px;
+}
+
+.confirmation-success {
+  border-color: var(--success);
+  background: #eef8f2;
+}
+
+.confirmation-success h2 {
+  color: var(--success);
+}
+
+.confirmation-failure {
+  border-color: var(--accent);
+  background: #fdf0ef;
+}
+
+.confirmation-failure h2 {
+  color: var(--accent);
+}
+
+.confirmation dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.confirmation dt {
+  color: var(--muted);
+}
+
+.confirmation dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Level 2 distractors — each is positioned so it never overlaps the centered
+   480px checkout card on a desktop viewport, and none use a full-screen backdrop. */
+
+.promo-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.promo-modal {
+  position: fixed;
+  top: 64px;
+  right: 16px;
+  z-index: 20;
+  width: 220px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.promo-modal p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.promo-modal .promo-modal-title {
+  margin-bottom: 6px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Level 3 upsell dark pattern — the trap button uses .btn-primary (prominent,
+   accent-colored) with the "Recommended" badge; the real button uses
+   .btn-secondary (plain). The visual weighting is the dark pattern itself. */
+
+.decoy-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.decoy-option {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.decoy-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--success);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Level progress indicator — a small "which rung of the ladder" strip shown on
+   every level page. Purely presentational, doesn't affect ground truth. */
+
+.level-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -8px 0 24px;
+}
+
+.level-progress-track {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.level-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.level-dot-done {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+
+.level-dot-current {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(36, 88, 230, 0.18);
+}
+
+.level-progress-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* Level 4 DOM shift — a brief highlight so the moment the button relocates is
+   visible to someone watching, not just to the classifier reading the log. */
+
+.dom-shift-flash {
+  animation: dom-shift-flash 0.6s ease-out;
+}
+
+@keyframes dom-shift-flash {
+  0% {
+    box-shadow: 0 0 0 4px rgba(232, 69, 60, 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 4px rgba(232, 69, 60, 0);
+  }
+}
+
+/* Level 6 — the decoy "skip to confirmation" link is styled to look like an
+   incidental, low-commitment shortcut rather than a real call to action. */
+
+.decoy-link {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.decoy-link:hover {
+  color: var(--text);
+}
+
+.cookie-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--text);
+  color: #fff;
+}

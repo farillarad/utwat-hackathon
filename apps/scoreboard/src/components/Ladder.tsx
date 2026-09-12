@@ -41,6 +41,16 @@ export default function Ladder({ levels, currentLevel }: Props) {
             {result?.failure_mode && (
               <span className={`stamp tag--${result.failure_mode}`}>{label(result.failure_mode)}</span>
             )}
+            {result && typeof result.agent_self_report === "boolean" && (
+              <span
+                className={`stamp belief ${
+                  result.agent_self_report !== (result.outcome === "completed") ? "belief--wrong" : "belief--right"
+                }`}
+              >
+                agent believed: {result.agent_self_report ? "succeeded" : "failed"}
+                {result.agent_self_report !== (result.outcome === "completed") && " — wrong"}
+              </span>
+            )}
           </li>
         );
       })}

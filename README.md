@@ -3,7 +3,7 @@
 See [PRD.md](PRD.md) for the full spec, scope decisions, timeline, and team assignments.
 
 ## Structure
-test
+
 ```
 apps/
   gauntlet/        Georgio + Tanay — the obstacle levels (1-6), React + Vite

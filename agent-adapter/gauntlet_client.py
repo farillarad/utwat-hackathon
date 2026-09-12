@@ -94,6 +94,20 @@ class GauntletClient:
                 return result
             time.sleep(0.5)
 
+    def self_report(self, run_id: str, level: int, believed_success: bool) -> None:
+        """Tell the server whether the agent itself thinks it succeeded. Call once per
+        level, after the agent has stopped acting. The scoreboard shows this next to
+        the ground truth, so "believed: succeeded" beside a failed Level 5 is the
+        story told live rather than explained."""
+        try:
+            self.http.post(
+                f"{self.server_url}/api/runs/{run_id}/levels/{level}/self-report",
+                json={"believed_success": believed_success},
+                timeout=5,
+            )
+        except requests.RequestException:
+            pass
+
     def end_run(self, run_id: str) -> None:
         try:
             self.http.post(f"{self.server_url}/api/runs/{run_id}/end", timeout=5)

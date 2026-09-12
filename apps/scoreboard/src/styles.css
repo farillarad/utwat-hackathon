@@ -529,6 +529,18 @@ button:focus-visible,
   border: 1px solid rgba(255, 107, 94, 0.4);
 }
 
+/* what the agent itself claimed vs. the ground truth */
+.belief--right {
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+
+.belief--wrong {
+  color: var(--live);
+  background: rgba(255, 198, 92, 0.12);
+  border: 1px solid rgba(255, 198, 92, 0.45);
+}
+
 .tag--completed {
   color: var(--pass);
   background: rgba(94, 225, 165, 0.14);

@@ -19,7 +19,11 @@ Optional, for the scoreboard's live browser pane:
 5. `POST /api/runs/{run_id}/frame` `{ "image": "<base64 jpeg>", "url": "<page url>" }`
    at ~1 fps while the agent works. The server relays frames to the scoreboard and
    keeps them for replay.
-6. `POST /api/runs/{run_id}/end` when the agent stops, so the board marks the lane done.
+6. `POST /api/runs/{run_id}/levels/{level}/self-report` `{ "believed_success": true|false }`
+   once the agent has stopped acting on a level — its own verdict, independent of
+   the ground truth. The board shows "agent believed: succeeded — wrong" next to a
+   failed level, which is the Level 5 story told live.
+7. `POST /api/runs/{run_id}/end` when the agent stops, so the board marks the lane done.
 
 ## Runners in this folder
 

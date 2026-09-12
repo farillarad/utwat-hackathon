@@ -147,6 +147,7 @@ def main() -> int:
             page.wait_for_load_state("networkidle")
             messages: list[dict] = []
             said_done = False
+            believed_success = False
             steps = 0
             print(f"\n--- level {level} ---")
 
@@ -190,6 +191,7 @@ def main() -> int:
                         print(f"  step {steps}: navigate {inp['url']}")
                     elif tool.name == "done":
                         said_done = True
+                        believed_success = bool(inp.get("success"))
                         print(f"  step {steps}: done success={inp.get('success')} — {inp.get('summary')}")
                 except Exception as exc:  # noqa: BLE001 — surface the failure to the model, keep going
                     result = f"error: {type(exc).__name__}: {exc}"
@@ -203,6 +205,9 @@ def main() -> int:
                 )
 
             frame()
+            # The agent's own verdict, independent of the ground truth. Hitting the step
+            # cap without calling done counts as "did not believe it succeeded".
+            client.self_report(run_id, level, believed_success)
             result = client.wait_for_level_result(run_id, level)
             summary.levels.append(
                 LevelSummary(
