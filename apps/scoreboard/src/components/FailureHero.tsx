@@ -1,12 +1,16 @@
 import type { LevelResult } from "@shared/schema/run";
 import type { GauntletEvent } from "@shared/schema/events";
-import { label } from "./RunLane";
 
 const TRACE_EXCERPT_LINES = 6;
 
-// The run's first failure, expanded as the dominant element in its lane — per
-// spec, nothing else should compete with it visually. Reads entirely from
-// data RunLane already has (levels/events); no new data flow.
+function label(mode: string) {
+  return mode.replace(/_/g, " ");
+}
+
+// The board's single failure detail panel, driven by whichever run is
+// selected — per spec, nothing else should compete with it visually. Reads
+// entirely from data ComparisonBoard already has (levels/events); no new
+// data flow.
 export default function FailureHero({ result, events }: { result: LevelResult; events: GauntletEvent[] }) {
   const trace = events.filter((e) => e.level === result.level).slice(-TRACE_EXCERPT_LINES);
   const selfReport = result.agent_self_report;

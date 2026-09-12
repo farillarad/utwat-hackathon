@@ -1,12 +1,12 @@
-import RunLane from "./components/RunLane";
+import ComparisonBoard from "./components/ComparisonBoard";
 import { useRunStream } from "./ws/useRunStream";
 
-const MAX_LANES = 2;
+const MAX_ROWS = 4;
 
 export default function App() {
   const { runs, connection, dismiss, clearAll } = useRunStream();
-  // Newest runs win the screen; older ones are still in memory and reappear when a lane is dismissed.
-  const visible = runs.slice(-MAX_LANES);
+  // Newest runs win the screen; older ones are still in memory and reappear when a row is dismissed.
+  const visible = runs.slice(-MAX_ROWS);
 
   return (
     <div className="board">
@@ -44,11 +44,7 @@ export default function App() {
           </div>
         </section>
       ) : (
-        <main className="lanes" data-lanes={visible.length}>
-          {visible.map((run) => (
-            <RunLane key={run.run_id} run={run} onDismiss={() => dismiss(run.run_id)} />
-          ))}
-        </main>
+        <ComparisonBoard runs={visible} onDismiss={dismiss} />
       )}
     </div>
   );

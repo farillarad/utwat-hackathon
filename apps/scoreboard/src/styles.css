@@ -82,6 +82,10 @@ code {
   border-radius: 4px;
 }
 
+button {
+  font: inherit;
+}
+
 button:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--live);
@@ -96,7 +100,7 @@ button:focus-visible,
   grid-template-rows: auto minmax(0, 1fr);
   padding: 18px 24px 24px;
   gap: 16px;
-  overflow: hidden; /* the board is a fixed stage; only the trace log scrolls */
+  overflow: hidden; /* header stays pinned; .comparison below scrolls itself if needed */
 }
 
 .board__head {
@@ -107,9 +111,7 @@ button:focus-visible,
   border-bottom: 1px solid var(--line);
 }
 
-.board__eyebrow,
-.lane__eyebrow,
-.score__label {
+.board__eyebrow {
   display: block;
   font-family: var(--mono);
   font-size: 11px;
@@ -169,13 +171,12 @@ button:focus-visible,
 }
 
 .btn {
-  font: inherit;
-  font-size: 13px;
   color: var(--text);
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 6px 12px;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -231,150 +232,336 @@ button:focus-visible,
   font-size: 14px;
 }
 
-/* ---- Lanes ---------------------------------------------------------- */
+/* ---- Comparison board ------------------------------------------------
+   One shared surface for every run instead of N full dashboard clones:
+   one score readout, one ladder axis, one detail pane, one trace log. */
 
-.lanes {
+.comparison {
   display: grid;
-  gap: 20px;
+  grid-template-rows: auto auto auto auto;
+  gap: 16px;
   min-height: 0;
+  /* With up to 4 rows, score+axis+detail+trace can exceed the viewport even
+     though each individual piece is compact. Scroll the whole surface rather
+     than silently clipping content the way a fixed-height, overflow:hidden
+     board would — the header above stays pinned since it's outside this. */
+  overflow-y: auto;
 }
 
-.lanes[data-lanes="2"] {
-  grid-template-columns: 1fr 1fr;
+/* ---- Comparative score ------------------------------------------------ */
+
+.cscore {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-.lane {
+.cscore__row {
+  flex: 1 1 220px;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 14px;
-  min-height: 0;
-  overflow: hidden;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto auto;
+  column-gap: 14px;
+  row-gap: 2px;
+  align-items: baseline;
+  text-align: left;
+  color: inherit;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 16px 18px 18px;
+  border-radius: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
 }
 
-.lane--ended {
-  border-color: #3a4452;
+.cscore__row:hover {
+  border-color: var(--muted);
 }
 
-.lane__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+.cscore__row--selected {
+  border-color: var(--live);
+  box-shadow: 0 0 0 1px rgba(255, 198, 92, 0.25);
 }
 
-.lane__agent {
-  font-size: 30px;
-  line-height: 1;
+.cscore__name {
+  grid-column: 1;
+  grid-row: 1;
+  font-family: var(--display);
+  font-size: 18px;
   text-transform: uppercase;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.score {
-  display: grid;
-  justify-items: end;
-  text-align: right;
-}
-
-.score__value {
+.cscore__value {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
   font-family: var(--display);
   font-weight: 700;
-  font-size: 52px;
-  line-height: 0.95;
+  font-size: 34px;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
-.score__max {
-  font-size: 24px;
+.cscore__max {
+  font-size: 16px;
   font-weight: 500;
   color: var(--muted);
 }
 
-.score__detail {
+.cscore__detail {
+  grid-column: 1;
+  grid-row: 2;
   font-family: var(--mono);
   font-size: 11px;
   color: var(--muted);
 }
 
-.lane__body {
-  display: grid;
-  gap: 16px;
-  min-height: 0;
-}
-
-.lane__left,
-.lane__right {
-  display: grid;
-  gap: 14px;
-  min-height: 0;
-}
-
-/* Single agent: browser left, rail + trace stacked right (PRD §11). */
-.lanes[data-lanes="1"] .lane__body {
-  grid-template-columns: minmax(0, 1.45fr) minmax(340px, 1fr);
-}
-
-.lanes[data-lanes="1"] .lane__right {
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-/* Two agents side by side: browser on top (height-capped so the rail stays on
-   screen), rail | trace beneath. */
-.lanes[data-lanes="2"] .lane__body {
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
-.lanes[data-lanes="2"] .lane__right {
-  grid-template-columns: minmax(230px, 0.9fr) minmax(0, 1.1fr);
-  align-items: start;
-}
-
-.lanes[data-lanes="2"] .browser__viewport {
-  aspect-ratio: auto;
-  height: clamp(180px, 30vh, 320px);
-}
-
-.lanes[data-lanes="2"] .transit-node {
-  width: 18px;
-  height: 18px;
-  font-size: 9px;
-}
-
-.lanes[data-lanes="2"] .transit-station-fail .transit-node {
-  width: 24px;
-  height: 24px;
+.cscore__delta {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  font-family: var(--mono);
   font-size: 11px;
+  color: var(--fail);
+  margin-top: 2px;
 }
 
-.lanes[data-lanes="2"] .transit-tick,
-.lanes[data-lanes="2"] .transit-time {
-  font-size: 9px;
+.cscore__delta--lead {
+  color: var(--live);
+  font-weight: 700;
 }
 
-.lane__left {
-  align-content: start;
+/* ---- Shared ladder axis ------------------------------------------------
+   Levels 1-6 are fixed, equal-width columns spanning the full width; every
+   run is a row plotted against that same axis, so a run dying at L5 and one
+   stalling at L2 read as different positions on one shared scale — not two
+   separate, incomparable thumbnails. */
+
+.axis {
+  display: grid;
+  gap: 4px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 18px 6px;
 }
 
-/* Compact per-run stat readout under the agent name. */
-.lane__stats {
+.axis__header {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 16px;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.axis__track--header {
+  position: relative;
+  height: 14px;
+}
+
+.axis__col-label {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.axis__row {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 16px;
+  align-items: center;
+  padding: 8px 8px;
+  margin: 0 -8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.axis__row:not(:last-child) {
+  border-bottom: 1px solid var(--line);
+}
+
+.axis__row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.axis__row--selected {
+  background: rgba(255, 198, 92, 0.07);
+}
+
+.axis__row--selected:hover {
+  background: rgba(255, 198, 92, 0.1);
+}
+
+.axis__runner {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.axis__runner-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.axis__runner-name {
+  font-family: var(--display);
+  font-size: 19px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.axis__dismiss {
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.axis__dismiss:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.axis__runner-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
-  margin-top: 4px;
+  gap: 4px 10px;
   font-family: var(--mono);
   font-size: 11px;
   color: var(--muted);
 }
 
-.lane__stats strong {
+.axis__runner-stats strong {
   color: var(--text);
   font-weight: 600;
 }
 
-.lane__stats-fail strong {
+.axis__runner-stats-fail {
   color: var(--fail);
+}
+
+.axis__track {
+  position: relative;
+  height: 34px;
+}
+
+.axis__rail {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  transform: translateY(-50%);
+  background-image: repeating-linear-gradient(to right, var(--pending) 0 5px, transparent 5px 9px);
+}
+
+.axis__rail-fill {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  height: 2px;
+  transform: translateY(-50%);
+  background: var(--pass);
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.axis__break {
+  position: absolute;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  border-right: 2px solid var(--fail);
+  border-bottom: 2px solid var(--fail);
+  cursor: pointer;
+  transition: left 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: axis-break-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes axis-break-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgba(255, 59, 48, 0.6));
+  }
+  50% {
+    filter: drop-shadow(0 0 5px rgba(255, 59, 48, 0.6));
+  }
+}
+
+.axis__node {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--panel-2);
+  border: 2px solid var(--pending);
+  color: var(--muted);
+  transition: all 0.4s ease;
+}
+
+.axis__node--locked {
+  opacity: 0.4;
+}
+
+.axis__node--current {
+  border-color: var(--live);
+  color: var(--live);
+  background: rgba(255, 198, 92, 0.15);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.axis__node--pass {
+  border-color: var(--pass);
+  color: var(--pass);
+  background: rgba(127, 160, 143, 0.14);
+}
+
+.axis__node--fail {
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  border-color: var(--fail);
+  background: var(--fail);
+  color: #1a0906;
+  box-shadow: 0 0 0 6px rgba(255, 59, 48, 0.15), 0 0 20px rgba(255, 59, 48, 0.55);
+}
+
+/* ---- Selection detail row: video feed | failure hero ------------------- */
+
+.comparison__detail {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.comparison__detail > *:only-child {
+  grid-column: 1 / -1;
 }
 
 /* ---- Browser view --------------------------------------------------- */
@@ -439,159 +626,53 @@ button:focus-visible,
   text-align: center;
 }
 
-/* ---- Transit line ----------------------------------------------------
-   A run is strictly sequential, so this is a single horizontal line with
-   stations, not an enumerated list. Solid up to the last reached station,
-   severed hard at the first failure, dashed/dim beyond it (unreached).
-   Station spacing encodes each level's duration_s where it's known. */
-
-.transit {
-  padding: 18px 4px 4px;
+.browser__summary {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  text-align: center;
+  padding: 20px;
 }
 
-.transit-track {
-  position: relative;
-  height: 74px;
-  margin: 0 18px;
-}
-
-.transit-rail {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 2px;
-  transform: translateY(-50%);
-  background-image: repeating-linear-gradient(to right, var(--pending) 0 5px, transparent 5px 9px);
-}
-
-.transit-rail-fill {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  height: 2px;
-  transform: translateY(-50%);
-  background: var(--pass);
-  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.transit-break {
-  position: absolute;
-  top: 50%;
-  width: 11px;
-  height: 11px;
-  transform: translate(-50%, -50%) rotate(45deg);
-  border-right: 2px solid var(--fail);
-  border-bottom: 2px solid var(--fail);
-  transition: left 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.transit-pip {
-  position: absolute;
-  top: calc(50% + 14px);
-  width: 6px;
-  height: 6px;
-  transform: translate(-50%, 0) rotate(45deg);
-  background: var(--live);
-  transition: left 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.transit-pip-fail {
-  background: var(--fail);
-  animation: pip-hard-stop 0.4s ease-out forwards, pip-fail-pulse 1.6s ease-in-out 0.4s infinite;
-}
-
-@keyframes pip-hard-stop {
-  0% {
-    transform: translate(-50%, 0) rotate(45deg) scale(1);
-  }
-  40% {
-    transform: translate(-50%, 0) rotate(45deg) scale(2.1);
-  }
-  100% {
-    transform: translate(-50%, 0) rotate(45deg) scale(1);
-  }
-}
-
-@keyframes pip-fail-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.55);
-  }
-  50% {
-    box-shadow: 0 0 0 7px rgba(255, 59, 48, 0);
-  }
-}
-
-.transit-station {
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-
-.transit-node {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
+.browser__summary-status {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.browser__summary-score {
+  font-family: var(--display);
   font-weight: 700;
-  background: var(--panel-2);
-  border: 2px solid var(--pending);
-  color: var(--muted);
-  transition: all 0.4s ease;
-}
-
-.transit-tick,
-.transit-time {
-  font-family: var(--mono);
-  font-size: 10px;
-  color: var(--muted);
-}
-
-.transit-station-locked .transit-node,
-.transit-station-locked .transit-tick {
-  opacity: 0.4;
-}
-
-.transit-station-current .transit-node {
-  border-color: var(--live);
+  font-size: 40px;
+  line-height: 1;
   color: var(--live);
-  background: rgba(255, 198, 92, 0.15);
-  animation: pulse 1.2s ease-in-out infinite;
 }
 
-.transit-station-pass .transit-node {
-  border-color: var(--pass);
-  color: var(--pass);
-  background: rgba(127, 160, 143, 0.14);
+.browser__summary-max {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--muted);
 }
 
-.transit-station-fail .transit-node {
-  width: 28px;
-  height: 28px;
-  font-size: 13px;
-  border-color: var(--fail);
-  background: var(--fail);
-  color: #1a0906;
-  box-shadow: 0 0 0 6px rgba(255, 59, 48, 0.15), 0 0 20px rgba(255, 59, 48, 0.55);
+.browser__summary-stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
 }
 
-.transit-station-fail .transit-tick {
-  color: var(--fail);
-  font-weight: 800;
+.browser__summary-stats strong {
+  color: var(--text);
 }
 
 /* ---- Failure hero ------------------------------------------------------
-   The run's first failure, expanded as the dominant element in its lane.
-   Nothing else on the board uses --fail at this weight/scale. */
+   The board's one failure detail panel, driven by whichever run is
+   selected. Nothing else on the board uses --fail at this weight/scale. */
 
 .failure-hero {
   border: 1px solid rgba(255, 59, 48, 0.45);
@@ -664,14 +745,18 @@ button:focus-visible,
   overflow-x: auto;
 }
 
-/* ---- Trace log ------------------------------------------------------ */
+/* ---- Trace log ------------------------------------------------------
+   One merged, full-width log instead of one per run. Rows wrap instead of
+   clipping — a narrow column truncating mid-word is exactly what this
+   replaces. */
 
 .trace {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  min-height: 160px;
-  max-height: 100%;
-  align-self: stretch;
+  /* Fixed height (not "whatever's left") so the log always gets its own
+     compact, internally-scrolling pane regardless of how many rows are
+     above it — new events auto-scroll within this box, not the whole page. */
+  height: 280px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #0b0f14;
@@ -680,7 +765,8 @@ button:focus-visible,
 
 .trace__head {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
   padding: 6px 12px;
   border-bottom: 1px solid var(--line);
   font-family: var(--mono);
@@ -688,6 +774,49 @@ button:focus-visible,
   text-transform: uppercase;
   letter-spacing: 0.14em;
   color: var(--muted);
+}
+
+.trace__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.trace__filter {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 9px;
+  cursor: pointer;
+}
+
+.trace__filter:hover {
+  border-color: var(--muted);
+  color: var(--text);
+}
+
+.trace__filter.src-a,
+.trace__filter.src-b,
+.trace__filter.src-c,
+.trace__filter.src-d {
+  border-color: currentColor;
+}
+
+.trace__filter.trace__filter--active {
+  color: var(--bg);
+  background: var(--live);
+  border-color: var(--live);
+  font-weight: 700;
+}
+
+.trace__count {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .trace__list {
@@ -701,22 +830,46 @@ button:focus-visible,
 
 .trace__row {
   display: grid;
-  grid-template-columns: 30px 66px 1fr;
+  grid-template-columns: 96px 30px 66px 1fr;
   gap: 10px;
-  padding: 3px 12px;
+  padding: 4px 12px;
   color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .trace__row:nth-child(even) {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.trace__source {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.src-a {
+  color: #6fb3ff;
+}
+
+.src-b {
+  color: #ff9f6e;
+}
+
+.src-c {
+  color: #b39cff;
+}
+
+.src-d {
+  color: #6fe0c9;
+}
+
 .trace__level,
 .trace__ts {
   color: var(--muted);
+}
+
+.trace__what {
+  overflow-wrap: anywhere;
 }
 
 .trace__row--level_start .trace__what,
@@ -748,17 +901,19 @@ button:focus-visible,
 
 @media (prefers-reduced-motion: reduce) {
   .pill--live .pill__dot,
-  .transit-station-current .transit-node,
-  .transit-pip-fail {
+  .axis__node--current,
+  .axis__break {
     animation: none;
   }
 }
 
-@media (max-width: 1100px) {
-  .lanes[data-lanes="2"] {
+@media (max-width: 900px) {
+  .comparison__detail {
     grid-template-columns: 1fr;
   }
-  .lanes[data-lanes="1"] .lane__body {
-    grid-template-columns: 1fr;
+
+  .axis__header,
+  .axis__row {
+    grid-template-columns: 140px 1fr;
   }
 }
