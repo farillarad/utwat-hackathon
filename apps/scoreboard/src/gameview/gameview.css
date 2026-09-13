@@ -132,13 +132,40 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto 1fr auto auto auto;
   align-items: center;
   gap: 18px;
   padding: 10px 20px;
   background: linear-gradient(180deg, var(--gv-glass-hi), var(--gv-glass));
   border-bottom: 1px solid var(--gv-line);
   overflow: hidden;
+}
+
+/* Live server data / the bundled pilot export / illustrative fixtures — the
+   view never hides which one is on screen (mirrors the cockpit's demo vs
+   recorded language so the two screens read as one product). */
+.gv-topbar__feed {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 4px 8px;
+  border: 1px solid var(--gv-line);
+  border-radius: 3px;
+  color: var(--gv-ink-dim);
+  white-space: nowrap;
+}
+
+.gv-topbar__feed--live {
+  color: var(--gv-docked);
+  border-color: color-mix(in srgb, var(--gv-docked) 45%, transparent);
+  background: color-mix(in srgb, var(--gv-docked) 12%, transparent);
+}
+
+.gv-topbar__feed--recorded {
+  color: var(--accent);
+  border-color: var(--accent-soft);
+  background: var(--accent-soft);
 }
 
 .gv-topbar__icons {

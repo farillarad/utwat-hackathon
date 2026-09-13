@@ -2,8 +2,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RunRecord } from "@shared/schema/benchmarkRun";
 import { getRunDuration, isBenchmarkRun } from "./benchmark";
 
+// Where a non-empty run list actually came from: the live server (an agent is
+// running right now, or already has runs on disk) vs. the static pilot export
+// bundled with the build (PRD-v2 §11/T9 — the page must still render real
+// results with the server stopped). Callers use this to prefer real data over
+// illustrative fixtures without hiding which kind of "real" it is.
+export type ResultsOrigin = "live" | "recorded" | "none";
+
 export function useBenchmarkRuns() {
   const [runs, setRuns] = useState<RunRecord[]>([]);
+  const [origin, setOrigin] = useState<ResultsOrigin>("none");
   const [status, setStatus] = useState<"connecting" | "connected" | "offline">("connecting");
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
@@ -12,24 +20,48 @@ export function useBenchmarkRuns() {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
     let active: AbortController | null = null;
+
+    const fetchJson = async (url: string) => {
+      const response = await fetch(url, { signal: active!.signal, cache: url.endsWith(".json") ? "no-store" : undefined });
+      if (!response.ok) throw new Error(`${url} returned ${response.status}`);
+      const data: unknown = await response.json();
+      if (!Array.isArray(data) || !data.every(isBenchmarkRun)) throw new Error(`${url} returned an unsupported run format.`);
+      return data;
+    };
+
     const poll = async () => {
       active = new AbortController();
       const timeout = window.setTimeout(() => active?.abort(), 6000);
+      const base = (import.meta.env.VITE_INSTRUMENTATION_API ?? "").replace(/\/$/, "");
       try {
-        const base = (import.meta.env.VITE_INSTRUMENTATION_API ?? "").replace(/\/$/, "");
-        const response = await fetch(`${base}/api/results`, { signal: active.signal });
-        if (!response.ok) throw new Error(`Results API returned ${response.status}`);
-        const data: unknown = await response.json();
-        if (!Array.isArray(data) || !data.every(isBenchmarkRun)) throw new Error("The results API returned an unsupported run format.");
+        // The live server first — an agent mid-run, or runs it already has on disk.
+        const live = await fetchJson(`${base}/api/results`);
         if (!disposed) {
-          setRuns(data);
+          setRuns(live);
+          setOrigin(live.length ? "live" : "none");
           setStatus("connected");
           setError("");
         }
-      } catch (cause) {
-        if (!disposed) {
-          setStatus("offline");
-          setError(cause instanceof Error ? cause.message : "Could not reach the results API.");
+        if (live.length) return;
+        throw new Error("no live runs yet"); // fall through to the pilot export below
+      } catch (liveCause) {
+        // No live runs (or no server): the bundled pilot export still counts as
+        // real recorded data, not the illustrative demo fixtures.
+        try {
+          const recorded = await fetchJson("/results.json");
+          if (!disposed) {
+            setRuns(recorded);
+            setOrigin(recorded.length ? "recorded" : "none");
+            setStatus("connected");
+            setError("");
+          }
+        } catch (fileCause) {
+          if (!disposed) {
+            setOrigin("none");
+            setStatus("offline");
+            setError(liveCause instanceof Error ? liveCause.message : "Could not reach the results API.");
+          }
+          void fileCause;
         }
       } finally {
         window.clearTimeout(timeout);
@@ -44,7 +76,7 @@ export function useBenchmarkRuns() {
     };
   }, [revision]);
 
-  return { runs, status, error, refresh: useCallback(() => setRevision((value) => value + 1), []) };
+  return { runs, origin, status, error, refresh: useCallback(() => setRevision((value) => value + 1), []) };
 }
 
 export function useFlightReplay(run: RunRecord | undefined, reducedMotion: boolean) {

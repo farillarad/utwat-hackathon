@@ -1,5 +1,7 @@
 import { useMemo, useRef, useState, type CSSProperties } from "react";
+import type { RunRecord } from "@shared/schema/benchmarkRun";
 import { useNow } from "../lib/useNow";
+import { useBenchmarkRuns, type ResultsOrigin } from "../lib/useBenchmarkRuns";
 import { MOCK_RESULTS } from "./mockResults";
 import {
   MECHANIC_BRIEF,
@@ -12,6 +14,45 @@ import {
   type PadResult,
 } from "./types";
 import "./gameview.css";
+
+// RunRecord (PRD-v2 §8) carries every field a pad needs, one for one — this is
+// a projection, not a reinterpretation.
+function runToPad(run: RunRecord): PadResult {
+  return {
+    levelId: run.level_id,
+    mechanic: run.mechanic,
+    variant: run.variant as 1 | 2,
+    agentName: run.agent_name,
+    model: run.model,
+    claimed: run.agent_claimed_success,
+    actual: run.ground_truth_success,
+    orderIdReturned: run.order_id_returned ?? null,
+    durationS: run.duration_s,
+    llmCostUsd: run.llm_cost_usd,
+    rejectedClaims: run.rejected_claims,
+    duplicateOrders: run.duplicate_orders,
+    wrapperEnabled: run.wrapper_enabled,
+  };
+}
+
+// One representative run per level (PRD §11: "animate one representative run
+// per level; trial variance lives on the stats page"), preferring the
+// wrapper-off baseline and, among ties, the most recently resolved attempt.
+function representativeRuns(runs: RunRecord[]): Map<number, PadResult> {
+  const byLevel = new Map<number, RunRecord[]>();
+  for (const run of runs) {
+    if (run.resolved_at === null) continue; // an unresolved run has no outcome to animate yet
+    (byLevel.get(run.level_id) ?? byLevel.set(run.level_id, []).get(run.level_id)!).push(run);
+  }
+  const picked = new Map<number, PadResult>();
+  for (const [levelId, candidates] of byLevel) {
+    const baselineOnly = candidates.filter((run) => !run.wrapper_enabled);
+    const pool = baselineOnly.length ? baselineOnly : candidates;
+    const best = pool.reduce((latest, run) => (run.resolved_at! > latest.resolved_at! ? run : latest));
+    picked.set(levelId, runToPad(best));
+  }
+  return picked;
+}
 
 function formatClock(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -93,28 +134,40 @@ export default function GameView() {
   const mountedAtRef = useRef(Date.now());
   const [locked, setLocked] = useState<Mechanic>(MECHANIC_ORDER[0]);
 
+  // Real data (live server, or the bundled pilot export — PRD §11/T9) fills in
+  // per level; a level with no resolved run of its own yet keeps its
+  // illustrative pad so the wall of 12 bays is never half-empty.
+  const api = useBenchmarkRuns();
+  const live = useMemo(() => representativeRuns(api.runs), [api.runs]);
+  const results = useMemo(
+    () => MOCK_RESULTS.map((mock) => live.get(mock.levelId) ?? mock),
+    [live]
+  );
+  const liveCount = live.size;
+  const origin: ResultsOrigin = liveCount === 0 ? "none" : api.origin;
+
   const byMechanic = useMemo(() => {
     const map = new Map<Mechanic, PadResult[]>();
     for (const m of MECHANIC_ORDER) map.set(m, []);
-    for (const r of MOCK_RESULTS) map.get(r.mechanic)!.push(r);
+    for (const r of results) map.get(r.mechanic)!.push(r);
     for (const list of map.values()) list.sort((a, b) => a.variant - b.variant);
     return map;
-  }, []);
+  }, [results]);
 
   const totals = useMemo(() => {
-    const claimed = MOCK_RESULTS.filter((r) => r.claimed);
+    const claimed = results.filter((r) => r.claimed);
     const falseSuccess = claimed.filter((r) => !r.actual);
-    const trueSuccess = MOCK_RESULTS.filter((r) => r.actual);
+    const trueSuccess = results.filter((r) => r.actual);
     return {
-      runs: MOCK_RESULTS.length,
+      runs: results.length,
       claimed: claimed.length,
       falseSuccess: falseSuccess.length,
       trueSuccess: trueSuccess.length,
       fsrPct: pct(falseSuccess.length, claimed.length),
-      tsrPct: pct(trueSuccess.length, MOCK_RESULTS.length),
-      claimPct: pct(claimed.length, MOCK_RESULTS.length),
+      tsrPct: pct(trueSuccess.length, results.length),
+      claimPct: pct(claimed.length, results.length),
     };
-  }, []);
+  }, [results]);
 
   const lockedPads = byMechanic.get(locked)!;
   const lockedPrimary = lockedPads[0];
@@ -146,6 +199,11 @@ export default function GameView() {
           <span className="gv-topbar__label">{MECHANIC_LABEL[locked]}</span>
           <span className="gv-topbar__sub">BAY {String(lockedIndex + 1).padStart(2, "0")} · INFO</span>
         </div>
+        <span className={`gv-topbar__feed gv-topbar__feed--${origin}`}>
+          {origin === "none"
+            ? "DEMO DATA"
+            : `${origin === "live" ? "LIVE" : "PILOT EXPORT"} · ${liveCount}/12`}
+        </span>
         <div className="gv-topbar__clock">{formatClock(now - mountedAtRef.current)}</div>
       </header>
 
@@ -161,7 +219,7 @@ export default function GameView() {
           <div className="gv-cellbank">
             <span className="gv-cellbank__label">RESOLVED</span>
             <div className="gv-cellbank__cells">
-              {MOCK_RESULTS.map((r) => (
+              {results.map((r) => (
                 <span key={r.levelId} className="gv-cellbank__cell gv-cellbank__cell--filled" />
               ))}
             </div>
