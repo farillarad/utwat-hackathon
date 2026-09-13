@@ -123,7 +123,15 @@
 .cockpit-verdict-values strong { display: block; margin-top: 4px; font-size: 13px; font-weight: 400; color: var(--hud-bright); text-shadow: var(--hud-glow); }
 .cockpit-verdict-values > b { font-weight: 400; color: #76563d; font-size: 20px; }
 .cockpit-verdict-values .cockpit-truth strong { color: var(--state); }
-.cockpit-systems { position: absolute; top: 30%; right: 4.5%; width: 20%; max-width: 322px; transform: perspective(1000px) rotateY(-12deg) rotateZ(1deg); transform-origin: right center; }
+/* bottom is telemetry's own `bottom: 12%` plus its reserved min-height plus a
+   gap, so the sidebar's box always ends above telemetry's top edge instead of
+   growing into it (the two were previously positioned independently, with
+   nothing tying the sidebar's height to how tall the panel below it is).
+   overflow-y is a hard backstop, not the primary mechanism: flex + the
+   order-lock's margin-top: auto (below) keeps content from ever needing it
+   at supported sizes, but content can never escape the reserved box either
+   way. */
+.cockpit-systems { position: absolute; top: 30%; right: 4.5%; width: 20%; max-width: 322px; bottom: calc(12% + 172px); display: flex; flex-direction: column; overflow-y: auto; transform: perspective(1000px) rotateY(-12deg) rotateZ(1deg); transform-origin: right center; }
 .cockpit-agent-select { display: grid; gap: 5px; margin-top: 13px; }
 .cockpit-agent-select select { width: 100%; min-height: 32px; background: #05080c66; color: var(--hud-bright); border: 0; border-bottom: 1px solid #c8873533; padding: 3px 5px 5px 0; font-family: var(--flight-font); font-size: 17px; text-transform: uppercase; letter-spacing: .055em; }
 .cockpit select option { background: #111217; color: #ffd19d; }
@@ -142,7 +150,11 @@
 .cockpit-system-readouts > div { display: flex; align-items: center; justify-content: space-between; }
 .cockpit-system-readouts dt { color: var(--hud-dim); text-transform: uppercase; font-size: 9px; }
 .cockpit-system-readouts dd { margin: 0; color: var(--hud-bright); font-size: 16px; font-weight: 400; }
-.cockpit-order-lock { border-top: 1px solid var(--hud-line); padding-top: 12px; display: grid; gap: 5px; }
+/* margin-top: auto pins this to the bottom of the now-flex .cockpit-systems
+   box regardless of how tall the controls above it render (agent select,
+   shield toggle, action meter, readouts, the conditional trial select) — so
+   it can only ever end at the box's own bottom edge, never past it. */
+.cockpit-order-lock { border-top: 1px solid var(--hud-line); padding-top: 12px; display: grid; gap: 5px; margin-top: auto; }
 .cockpit-order-lock strong { font-size: 12px; font-weight: 400; letter-spacing: .03em; color: #d4ad83; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cockpit-order-lock > span:last-child { color: #a7917b; font-size: 9px; }
 .cockpit-trial-select { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--hud-dim); font-size: 9px; }
@@ -190,7 +202,9 @@
 .cockpit--moving .radar-pulse { animation: contact-pulse 2.8s ease-out infinite; transform-origin: 0 -18px; }
 .radar-ownship { fill: #ffba68; filter: drop-shadow(0 0 5px #ff8c2666); }
 .radar-caption { fill: #a17243; font: 7px var(--flight-mono); letter-spacing: .08em; }
-.cockpit-telemetry { position: absolute; right: 4.2%; bottom: 12%; width: 22.8%; transform: perspective(900px) rotateY(-13deg) rotateZ(3deg); transform-origin: right bottom; }
+/* min-height keeps this panel's footprint predictable so .cockpit-systems
+   (above) can reserve exactly enough room for it — see that rule's comment. */
+.cockpit-telemetry { position: absolute; right: 4.2%; bottom: 12%; width: 22.8%; min-height: 160px; transform: perspective(900px) rotateY(-13deg) rotateZ(3deg); transform-origin: right bottom; }
 .cockpit-telemetry-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; margin-top: 10px; }
 .cockpit-telemetry-grid > div { display: grid; gap: 3px; }
 .cockpit-telemetry-grid span { font-size: 8px; text-transform: uppercase; color: #c0905d; white-space: nowrap; }
@@ -271,7 +285,9 @@
   .cockpit-brand-mark { display: none; }
   .cockpit-brand h1 { font-size: 22px; }
   .cockpit-nav { left: 3%; width: 23%; }
-  .cockpit-systems { right: 3%; width: 22%; }
+  /* telemetry's bottom moves to 15% and shrinks in this band (below) — the
+     sidebar's reserve has to move with it or the overlap comes back here. */
+  .cockpit-systems { right: 3%; width: 22%; bottom: calc(15% + 138px); }
   .cockpit-sector { gap: 4px; grid-template-columns: 23px 1fr 7px; }
   .cockpit-header-actions { gap: 2px; }
   .cockpit-header-motto { display: none; }
@@ -285,14 +301,17 @@
   .cockpit-hologram { right: 24%; width: 12%; bottom: 14%; }
   .cockpit-recorder, .cockpit-telemetry { bottom: 15%; }
   .cockpit-recorder { width: 25%; left: 3%; }
-  .cockpit-telemetry { width: 25%; right: 3%; }
+  .cockpit-telemetry { width: 25%; right: 3%; min-height: 130px; }
   .cockpit-telemetry-grid { gap: 6px; }
   .cockpit-telemetry-grid span { font-size: 7px; }
   .cockpit-telemetry-grid small { font-size: 7px; }
   .cockpit-radar-console { bottom: 12%; }
   .cockpit-radar-console > .cockpit-eyebrow { margin-bottom: -15px; }
 }
-@media (max-height: 790px) and (min-width: 761px) {
+/* 950px (not 790) because .cockpit-systems now has to fit above the reserved
+   .cockpit-telemetry space (see both rules' comments) — with the trial
+   select shown, its content gets tight well before 790px tall. */
+@media (max-height: 950px) and (min-width: 761px) {
   .cockpit { min-height: 680px; }
   .cockpit-header-motto { font-size: 9px; }
   .cockpit-mission { top: 17.4%; }
@@ -300,13 +319,29 @@
   .cockpit-nav, .cockpit-systems { top: 29.5%; }
   .cockpit-objective { margin-top: 14px; }
   .cockpit-sector { min-height: 27px; }
-  .cockpit-shield-control { margin: 10px 0 12px; }
-  .cockpit-system-readouts { margin: 11px 0; gap: 6px; }
+  .cockpit-systems .cockpit-rule-heading { padding-bottom: 6px; }
+  .cockpit-agent-select { margin-top: 8px; gap: 4px; }
+  .cockpit-agent-select select { font-size: 15px; }
+  .cockpit-shield-control { margin: 8px 0 10px; }
+  .cockpit-action-meter { gap: 6px; }
+  .cockpit-system-readouts { margin: 8px 0 6px; gap: 6px; }
+  .cockpit-system-readouts dd { font-size: 14px; }
+  .cockpit-trial-select { margin-bottom: 6px; }
+  .cockpit-order-lock { padding-top: 8px; gap: 3px; }
   .cockpit-verdict-head { font-size: 9px; }
   .cockpit-verdict-values { margin-top: 6px; }
   .cockpit-recorder ol { gap: 5px; min-height: 73px; }
   .cockpit-telemetry-grid { margin-top: 7px; }
   .cockpit-cargo-status { margin-top: 7px; }
+}
+/* Below ~820px tall even the always-present controls are tight (a common
+   laptop viewport, e.g. 1366x768, lands here). The trial picker is the one
+   optional control — it only renders when a cohort has more than one
+   recorded trial — so it's the thing to drop rather than compressing
+   everything else further; .cockpit-order-lock (margin-top: auto) simply
+   takes the room it frees. */
+@media (max-height: 820px) and (min-width: 761px) {
+  .cockpit-trial-select { display: none; }
 }
 @media (max-width: 760px) {
   .cockpit { height: auto; min-height: 100svh; overflow: hidden; padding: 25px 20px 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 25px 18px; }
