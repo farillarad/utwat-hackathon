@@ -49,7 +49,7 @@ const REQUIRED: Array<[keyof Run, string]> = [
 ];
 
 // Scripted policies, smoke tests and the human baseline are not contestants (§9, §10).
-const isNonAgent = (r: Run) => /^(scripted|human|curl)/.test(r.agent_name) || r.agent_name.includes("smoke") || r.steps_used === 0;
+const isNonAgent = (r: Run) => /^(scripted|human|manual|curl)/.test(r.agent_name) || r.agent_name.includes("smoke") || r.steps_used === 0;
 
 function validate(run: Run): string[] {
   const problems: string[] = [];
@@ -102,7 +102,7 @@ async function main() {
   const all = loaded.filter((r) => typeof r.level_id === "number");
   if (all.length !== loaded.length) console.log(`(skipping ${loaded.length - all.length} pre-v2 record(s))`);
   const runs = all.filter((r) => !isNonAgent(r));
-  const humans = all.filter((r) => r.agent_name.startsWith("human"));
+  const humans = all.filter((r) => /^(human|manual)/.test(r.agent_name));
   const expect = Number(flag("expect") ?? 0);
   console.log(`${all.length} records (${runs.length} agent runs)${expect ? `, expected ${expect}` : ""}`);
 

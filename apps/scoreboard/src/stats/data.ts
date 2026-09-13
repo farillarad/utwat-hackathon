@@ -53,8 +53,8 @@ export interface RunRecord {
   duration_s: number;
 }
 
-export const isHuman = (r: RunRecord) => r.agent_name.startsWith("human");
-export const isContestant = (r: RunRecord) => !/^(scripted|human)/.test(r.agent_name) && !r.agent_name.includes("smoke");
+export const isHuman = (r: RunRecord) => /^(human|manual)/.test(r.agent_name); // Farill's store names tester runs "manual"
+export const isContestant = (r: RunRecord) => !/^(scripted|human|manual|curl)/.test(r.agent_name) && !r.agent_name.includes("smoke") && r.steps_used > 0;
 
 export interface Cell {
   runs: number;
