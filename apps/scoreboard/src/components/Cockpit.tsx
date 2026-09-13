@@ -132,8 +132,9 @@ export default function Cockpit() {
       <aside className="cockpit-nav" aria-label="Test sector navigation">
         <div className="cockpit-rule-heading"><span>Navigation</span><small>06 sectors</small></div>
         <div className="cockpit-sector-list">
-          {SECTORS.map((item) => <button key={item.id} className={`cockpit-sector${item.id === sector.id ? " is-selected" : ""}`} aria-pressed={item.id === sector.id} aria-label={`Sector ${String(item.id).padStart(2, "0")}: ${item.name}`} onClick={() => chooseLevel(item.levels[level.variant - 1] ?? item.levels[0])}>
+          {SECTORS.map((item) => <button key={item.id} className={`cockpit-sector${item.id === sector.id ? " is-selected" : ""}`} aria-pressed={item.id === sector.id} aria-label={`Sector ${String(item.id).padStart(2, "0")}: ${item.name}`} aria-describedby={`cockpit-sector-tip-${item.id}`} onClick={() => chooseLevel(item.levels[level.variant - 1] ?? item.levels[0])}>
             <span className="cockpit-sector-number">{String(item.id).padStart(2, "0")}</span><span>{item.name}</span><i aria-hidden="true" />
+            <span className="cockpit-sector-tip" id={`cockpit-sector-tip-${item.id}`} role="tooltip">{item.brief}</span>
           </button>)}
         </div>
         <div className="cockpit-variant-row"><span>Variant</span><div role="group" aria-label="Challenge variant">{sector.levels.map((id, i) => <button key={id} aria-pressed={id === levelId} onClick={() => chooseLevel(id)}>{String(i + 1).padStart(2, "0")}</button>)}</div></div>

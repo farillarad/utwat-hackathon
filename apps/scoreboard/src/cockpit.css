@@ -76,6 +76,10 @@
 .cockpit-sector.is-selected .cockpit-sector-number { color: var(--hud-bright); }
 .cockpit-sector i { display: none; border-left: 5px solid var(--hud); border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
 .cockpit-sector.is-selected i { display: block; }
+/* Hover/focus explainer for each sector. Floats to the right of the menu, over the scene. */
+.cockpit-nav:hover, .cockpit-nav:focus-within { z-index: 6; }
+.cockpit-sector-tip { position: absolute; left: calc(100% + 14px); top: 50%; z-index: 6; width: max-content; max-width: 260px; padding: 9px 11px; background: #0b0d12f2; border: 1px solid var(--hud-line); border-left: 2px solid var(--hud); box-shadow: 0 8px 24px #000a, var(--hud-glow); color: #f1cfa4; font-family: var(--flight-mono); font-size: 11px; line-height: 1.5; letter-spacing: 0; text-transform: none; text-shadow: none; text-align: left; white-space: normal; opacity: 0; visibility: hidden; pointer-events: none; transform: translate(-4px, -50%); transition: opacity .15s, transform .15s, visibility .15s; }
+.cockpit-sector:hover .cockpit-sector-tip, .cockpit-sector:focus-visible .cockpit-sector-tip { opacity: 1; visibility: visible; transform: translate(0, -50%); }
 .cockpit-variant-row { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #c87d2226; padding-top: 10px; margin-top: 7px; font-size: 9px; color: var(--hud-dim); text-transform: uppercase; }
 .cockpit-variant-row > div { display: flex; gap: 5px; }
 .cockpit-variant-row button { width: 33px; height: 26px; border: 1px solid var(--hud-line); background: transparent; color: var(--hud-dim); }
@@ -367,6 +371,8 @@
   .cockpit-rule-heading small { display: none; }
   .cockpit-sector { font-size: 9px !important; min-height: 42px; grid-template-columns: 19px 1fr 5px; gap: 3px; padding: 4px; }
   .cockpit-sector-number { font-size: 9px; }
+  .cockpit-sector-tip { left: 0; top: calc(100% + 4px); max-width: min(260px, 88vw); transform: translateY(-4px); }
+  .cockpit-sector:hover .cockpit-sector-tip, .cockpit-sector:focus-visible .cockpit-sector-tip { transform: translateY(0); }
   .cockpit-variant-row button { width: 37px; height: 35px; }
   .cockpit-objective strong { font-size: 13px; }
   .cockpit-objective > span:last-child { line-height: 1.6; }
