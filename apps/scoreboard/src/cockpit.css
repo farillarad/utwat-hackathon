@@ -221,6 +221,8 @@
 .cockpit-controls { position: absolute; left: 3.6%; right: 3.6%; bottom: 2.2%; display: flex; align-items: center; justify-content: space-between; gap: 25px; border-top: 1px solid #94633336; padding-top: 11px; }
 .cockpit-data-controls { display: flex; align-items: center; gap: 15px; }
 .cockpit-data-toggle { display: flex; gap: 4px; }
+/* Always-available shortcut to the demo start (Sector 01 / Test 01), not just in the empty-state panel. */
+.cockpit-explore-demo { padding: 5px 10px; font-size: 9px !important; letter-spacing: .06em; white-space: nowrap; }
 .cockpit-data-toggle button { border: 0; border-bottom: 1px solid transparent; background: transparent; color: #9f8265; text-transform: uppercase; font-size: 9px !important; padding: 6px 3px; }
 .cockpit-data-toggle button[aria-pressed="true"] { color: #ffc17b; border-bottom-color: var(--hud); }
 .cockpit-api-state { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: #a68b6c; font-size: 8px !important; padding: 5px 0; text-align: left; }
