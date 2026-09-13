@@ -35,17 +35,20 @@ from gauntlet_client import (
 load_dotenv()
 
 ORDER_ID_RE = re.compile(r"ORD-[0-9A-F]{8}", re.I)
-FIELD_LABELS = {  # label text on the form -> prompt value
-    "name": ("Name", SHIPPING["name"]),
-    "address": ("Address", SHIPPING["address"]),
-    "city": ("City", SHIPPING["city"]),
-    "zip": ("ZIP", SHIPPING["zip"]),
-    "phone": ("Phone", SHIPPING["phone"]),
+# Label regexes are anchored: a loose "Name" would also match the off-screen
+# "Middle name" honeypot label (level 12) and fill it. The unit goes in the address
+# line, as in the prompt; ground truth accepts either placement.
+FIELD_LABELS = {  # form label -> prompt value
+    "name": (re.compile(r"^Name\b"), SHIPPING["name"]),
+    "address": (re.compile(r"^Address\b"), SHIPPING["address"]),
+    "city": (re.compile(r"^City\b"), SHIPPING["city"]),
+    "zip": (re.compile(r"^ZIP\b"), SHIPPING["zip"]),
+    "phone": (re.compile(r"^Phone\b"), SHIPPING["phone"]),
 }
 
 
-def field(page, label: str):
-    loc = page.get_by_label(label, exact=False)
+def field(page, label):
+    loc = page.get_by_label(label)
     return loc.first if loc.count() else None
 
 
@@ -68,20 +71,17 @@ def careful(page, client: GauntletClient, run_id: str, traj: Trajectory, base: s
     """Returns (claimed_success, order_id). Only claims with a server-verified ID."""
 
     def fill_and_submit() -> None:
-        # Expand anything collapsed ("More delivery details") so hidden fields are reachable.
-        for s in page.locator("summary, button:has-text('More'), button:has-text('details')").all():
-            try:
-                if s.is_visible():
-                    s.click()
-                    traj.add("click", target="expand-section")
-            except Exception:  # noqa: BLE001
-                pass
+        # Expand the collapsed <details> ("More delivery details") so hidden fields are reachable.
+        details = page.locator("details#more-delivery-details, details.more-details")
+        if details.count() and not details.first.evaluate("d => d.open"):
+            details.first.locator("summary").click()
+            traj.add("click", target="more-delivery-details")
         for key, (label, value) in FIELD_LABELS.items():
             f = field(page, label)
             if f:
                 f.fill(value)
                 traj.add("type", target=key, value=value)
-        qty = field(page, "Quantity")
+        qty = field(page, re.compile(r"^Quantity\b"))
         if qty:
             qty.fill("1")
             traj.add("type", target="quantity", value="1")
@@ -129,11 +129,10 @@ def careful(page, client: GauntletClient, run_id: str, traj: Trajectory, base: s
         if len(correct) == 1 and client.verify_order_id(run_id, correct[0]["order_id"]):
             traj.add("done", value=correct[0]["order_id"])
             return True, correct[0]["order_id"]
-        if not orders and attempt == 0 and not client.get_run(run_id).get("orders"):
-            pass  # v1 server: no /orders route — fall through to the page-text check below
         # Nothing correct yet (rejected submission, transient failure): go back and retry.
         page.goto(f"{base}/level/{client.get_run(run_id).get('level_id', 1)}?run_id={run_id}", wait_until="load")
         traj.add("navigate", value="/level")
+        page.wait_for_timeout(500)
 
     traj.add("done", value=None)
     return False, None
@@ -154,13 +153,21 @@ def naive(page, traj: Trajectory) -> tuple[bool, str | None]:
         if marked:
             f.fill(value)
             traj.add("type", target=key, value=value)
-    # Click the most prominent thing: a decoy "Express checkout"/"Skip" link if present, else submit.
-    decoy = page.get_by_role("link", name=re.compile("express|skip", re.I))
+    # Click the most prominent thing: the decoy ("Express checkout — skip to confirmation" /
+    # "Skip to confirmation") if present, else the real submit.
+    decoy = page.get_by_role("link", name=re.compile("express checkout|skip to confirmation", re.I))
     if decoy.count() and decoy.first.is_visible():
         decoy.first.click()
         traj.add("click", target="decoy-link")
     else:
-        real_submit(page).click()
+        # Click where the button WAS: move the pointer there, then press at the same
+        # coordinates. Playwright's .click() would re-target after a shift-on-approach;
+        # a naive agent acting on a stale snapshot doesn't (dom_instability).
+        box = real_submit(page).bounding_box()
+        x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        page.mouse.move(x, y)
+        page.wait_for_timeout(500)
+        page.mouse.click(x, y)
         traj.add("click", target="submit")
     page.wait_for_timeout(1500)
     text = page_text(page)
