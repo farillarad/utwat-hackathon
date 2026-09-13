@@ -239,7 +239,7 @@ class SteelBrowsers:
         self.timeout_ms = timeout_ms
 
     def create(self) -> SteelSession:
-        s = self.client.sessions.create(session_timeout=self.timeout_ms)
+        s = self.client.sessions.create(timeout=self.timeout_ms)
         return SteelSession(
             id=s.id,
             websocket_url=s.websocket_url,

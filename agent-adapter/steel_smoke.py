@@ -50,7 +50,7 @@ def main() -> int:
 
     client = GauntletClient(server_url=base, gauntlet_url=base)
     steel = Steel()
-    session = steel.sessions.create(session_timeout=300_000)
+    session = steel.sessions.create(timeout=300_000)
     print(f"steel session {session.id}\n  viewer: {session.session_viewer_url}")
 
     ok = True
@@ -70,24 +70,21 @@ def main() -> int:
             page.goto(url, wait_until="networkidle", timeout=60_000)
             print(f"  page loaded in {time.time() - t0:.1f}s: {page.title()!r}")
 
-            # Fill whatever shipping fields this level renders (v1 levels have few; v2 has all).
-            for key, value in SHIPPING.items():
-                loc = page.get_by_label(key.upper() if key == "zip" else key.capitalize(), exact=False)
+            # Georgio's v2 form: labels match the prompt (Name, Address, Unit / Apt, City, ZIP, Phone).
+            for label, value in (("Name", SHIPPING["name"]), ("Address", SHIPPING["address"]), ("City", SHIPPING["city"]),
+                                 ("ZIP", SHIPPING["zip"]), ("Phone", SHIPPING["phone"])):
+                loc = page.get_by_label(label, exact=False)
                 if loc.count():
                     loc.first.fill(value)
-            submit = page.get_by_role("button", name="Complete order")
-            if not submit.count():
-                submit = page.locator('button[type="submit"]')
-            submit.first.click()
+            page.get_by_role("button", name="Complete order").first.click()
             page.wait_for_timeout(2500)
-            print(f"  after submit: {page.url}")
+            order_no = page.locator("#order-number")
+            print(f"  after submit: {page.url}  order number on page: {order_no.first.inner_text() if order_no.count() else '(none)'}")
             browser.close()
 
         run = client.get_run(run_id)
-        orders = run.get("orders") or []  # v2 shape
-        levels = run.get("levels") or []  # v1 shape
-        accepted = [o for o in orders if o.get("status") == "active"] or [l for l in levels if l.get("outcome") == "completed"]
-        events = client.get_events(run_id)
+        accepted = [o for o in run.get("orders") or [] if o.get("status") == "active"]
+        events = run.get("page_events") or []
         print(f"\n  server: {len(accepted)} accepted order(s), {len(events)} page event(s)")
         if not accepted:
             ok = False
