@@ -29,9 +29,10 @@ function save(orders: OrderRecord[]) {
 
 const delay = () => new Promise((resolve) => setTimeout(resolve, LATENCY_MS));
 
+// Matches the server's format: ORD- + 8 uppercase hex.
 function issueOrderId(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(4));
-  return `ORD-${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+  return `ORD-${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
 }
 
 export function resetMockOrders() {
