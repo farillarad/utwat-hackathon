@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { useNow } from "../lib/useNow";
 import { MOCK_RESULTS } from "./mockResults";
 import {
@@ -46,8 +46,12 @@ function ShipGlyph({ className }: { className?: string }) {
 
 function Pad({ result }: { result: PadResult }) {
   const outcome = outcomeOf(result.claimed, result.actual);
+  const delay = `${(result.levelId % 6) * 0.18}s`;
   return (
-    <div className={`gv-pad gv-pad--${outcome}`} style={{ animationDelay: `${(result.levelId % 6) * 0.18}s` }}>
+    <div
+      className={`gv-pad gv-pad--${outcome}`}
+      style={{ "--gv-delay": delay } as CSSProperties}
+    >
       <div className="gv-pad__sky">
         <div className="gv-pad__ship">
           <ShipGlyph className="gv-pad__ship-glyph" />
@@ -120,9 +124,11 @@ export default function GameView() {
   const lockedIndex = MECHANIC_ORDER.indexOf(locked);
 
   return (
-    <div className="gv-screen">
+    <div className="gv-screen" data-mechanic={locked}>
       <div className="gv-stars" />
+      <div className="gv-stars gv-stars--far" />
       <div className="gv-vignette" />
+      <div className="gv-scanlines" />
 
       <header className="gv-topbar">
         <div className="gv-topbar__icons">
@@ -180,7 +186,7 @@ export default function GameView() {
                 <button
                   key={mechanic}
                   type="button"
-                  className={`gv-bay ${isLocked ? "gv-bay--locked" : ""}`}
+                  className={`gv-bay gv-bay--${mechanic} ${isLocked ? "gv-bay--locked" : ""}`}
                   onClick={() => setLocked(mechanic)}
                 >
                   <div className="gv-bay__label">

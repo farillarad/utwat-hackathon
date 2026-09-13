@@ -277,6 +277,25 @@ button:focus-visible,
   background: transparent;
 }
 
+/* ---- Game view host -------------------------------------------------------
+   Game view is its own full-bleed instrument (gameview.css) — this board
+   frame steps out of the way entirely and just floats the exit control. */
+
+.board--game {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.board__game-bar {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--hairline);
+}
+
 /* ---- Status bar ---------------------------------------------------------
    Session-level readouts in a thin instrument-silkscreen strip — dead
    space becomes information instead of a decorative pill. */
