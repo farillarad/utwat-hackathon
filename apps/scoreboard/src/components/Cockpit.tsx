@@ -6,12 +6,13 @@ import { useBenchmarkRuns, useReveal } from "../lib/useBenchmarkRuns";
 import { useReducedMotion } from "../lib/useReducedMotion";
 import { Canopy, Compass, FlightTarget, Planet, Radar, Ship, Starfield } from "./CockpitScene";
 
-function Icon({ name }: { name: "chart" | "expand" | "close" | "help" }) {
+function Icon({ name }: { name: "chart" | "expand" | "close" | "help" | "link" }) {
   const paths = {
     chart: <><path d="M4 19h16M7 15v-4M12 15V5M17 15V8" /></>,
     expand: <path d="M9 4H4v5M15 4h5v5M4 15v5h5M20 15v5h-5" />,
     close: <path d="M6 6l12 12M6 18L18 6" />,
     help: <><circle cx="12" cy="12" r="9" /><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4M12 16v1" /></>,
+    link: <><path d="M14 5h5v5M19 5l-9 9" /><path d="M6 5H5v14h14v-1" /></>,
   };
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
@@ -39,6 +40,10 @@ export default function Cockpit() {
   const frameRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLDialogElement>(null);
   const helpRef = useRef<HTMLDialogElement>(null);
+  const byoaRef = useRef<HTMLDialogElement>(null);
+  // Same base the dashboard itself talks to (useBenchmarkRuns) — window.location.origin
+  // is the honest fallback for display since "" only means something as a relative fetch.
+  const baseUrl = ((import.meta.env.VITE_INSTRUMENTATION_API as string | undefined) || window.location.origin).replace(/\/$/, "");
   const data = source === "demo" ? DEMO_RUNS : api.runs;
   const agents = useMemo(() => [...new Set(data.map((run) => run.agent_name))].sort(), [data]);
   const selectedAgent = agents.includes(agent) ? agent : agents[0] ?? "";
@@ -116,6 +121,7 @@ export default function Cockpit() {
         </div>
         <nav className="cockpit-header-actions" aria-label="Cockpit tools">
           <button className="cockpit-tool cockpit-results-button" onClick={() => resultsRef.current?.showModal()}><Icon name="chart" /><span>Results</span></button>
+          <button className="cockpit-tool cockpit-byoa-button" aria-label="Bring your own agent" onClick={() => byoaRef.current?.showModal()}><Icon name="link" /><span aria-hidden="true">Bring your own agent</span></button>
           <button className="cockpit-tool" aria-label="How the gauntlet works" onClick={() => helpRef.current?.showModal()}><Icon name="help" /></button>
           <button className="cockpit-tool" aria-label="Toggle fullscreen" onClick={fullscreen}><Icon name="expand" /></button>
         </nav>
@@ -187,6 +193,22 @@ export default function Cockpit() {
         <div className="cockpit-results-limit"><strong>Not a magic shield.</strong> A valid ID can still belong to the wrong order. The wrapper checks the ID; ground truth independently checks the contents.</div>
         <h3>Run archive <span>{cohort.length} in this agent / verification cohort</span></h3>
         <div className="cockpit-run-archive">{cohort.slice(0, 100).map((item) => <button key={item.run_id} onClick={() => selectRun(item)}><span>L{String(item.level_id).padStart(2, "0")} <small>Trial {item.trial}</small></span><span>{SECTORS.find((candidate) => candidate.mechanic === item.mechanic)?.name}</span><strong className={`archive-outcome--${getOutcome(item)}`}>{OUTCOME_LABELS[getOutcome(item)]}</strong><span aria-hidden="true">↗</span></button>)}{cohort.length > 100 && <p>Showing the 100 most recent runs in this cohort.</p>}</div>
+      </dialog>
+
+      <dialog className="cockpit-dialog cockpit-dialog--byoa" ref={byoaRef} aria-labelledby="cockpit-byoa-title">
+        <div className="cockpit-dialog-heading"><div><span className="cockpit-eyebrow">External agents</span><h2 id="cockpit-byoa-title">Any agent. Same gauntlet.</h2></div><button className="cockpit-icon-button" aria-label="Close" onClick={() => byoaRef.current?.close()}><Icon name="close" /></button></div>
+        <p>This isn't limited to the two agents shown here. Anything that can drive a real browser and make a few plain HTTP calls can run the same twelve tests, in any language or framework — the server checks its claim independently either way.</p>
+        <div className="cockpit-byoa-base"><span className="cockpit-eyebrow">Server base URL</span><code>{baseUrl}</code><span>This is just where this dashboard is currently pointed — if the gauntlet is hosted elsewhere for this run, ask whoever's hosting it.</span></div>
+        <pre className="cockpit-byoa-snippet">{`curl -X POST ${baseUrl}/api/runs/start \\
+  -H "Content-Type: application/json" \\
+  -d '{"agent_name": "your-agent-name", "level_id": 1}'
+
+→ 201 { "run_id": "...", "start_url": "..." }`}</pre>
+        <p>Point your agent's browser at <code>start_url</code>, let it work the task, then <code>POST /api/runs/&#123;run_id&#125;/claim</code> with what it believes happened — full contract, exact JSON shapes, and a copy-paste starter script:</p>
+        <div className="cockpit-byoa-links">
+          <a href="https://github.com/farillarad/utwat-hackathon/blob/main/BRING_YOUR_OWN_AGENT.md" target="_blank" rel="noreferrer">BRING_YOUR_OWN_AGENT.md <span aria-hidden="true">↗</span></a>
+          <a href="https://github.com/farillarad/utwat-hackathon/blob/main/agent-adapter/byoa_starter.py" target="_blank" rel="noreferrer">agent-adapter/byoa_starter.py <span aria-hidden="true">↗</span></a>
+        </div>
       </dialog>
       <dialog className="cockpit-dialog cockpit-dialog--help" ref={helpRef} aria-labelledby="cockpit-help-title">
         <div className="cockpit-dialog-heading"><div><span className="cockpit-eyebrow">Flight manual</span><h2 id="cockpit-help-title">Don’t trust the finish line.</h2></div><button className="cockpit-icon-button" aria-label="Close flight manual" onClick={() => helpRef.current?.close()}><Icon name="close" /></button></div>
