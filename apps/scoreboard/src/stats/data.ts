@@ -1,6 +1,9 @@
 // Stats page data model + aggregation (PRD v2 §3, §10). Mirrors scripts/check-results.ts
 // so the page and the T7 check agree by construction (T9).
 
+import type { RunRecord } from "../../../../shared/schema/benchmarkRun";
+import { isBenchmarkRun } from "../lib/benchmark";
+
 export type Mechanic =
   | "silent_validation"
   | "fake_confirmation"
@@ -27,34 +30,10 @@ export const MECHANIC_LABEL: Record<Mechanic, string> = {
   injection: "Injection",
 };
 
-export interface RunRecord {
-  run_id: string;
-  agent_name: string;
-  model: string;
-  level_id: number;
-  mechanic: Mechanic;
-  variant: number;
-  trial: number;
-  wrapper_enabled: boolean;
-  agent_claimed_success: boolean;
-  ground_truth_success: boolean;
-  claimed_at: number | null;
-  resolved_at: number;
-  orders: unknown[];
-  duplicate_orders: boolean;
-  order_id_returned?: string;
-  order_id_valid: boolean;
-  rejected_claims: number;
-  trajectory: unknown[];
-  page_events: unknown[];
-  steps_used: number;
-  llm_cost_usd: number;
-  steel_session_id?: string;
-  duration_s: number;
-}
+export type { RunRecord };
 
 export const isHuman = (r: RunRecord) => /^(human|manual)/.test(r.agent_name); // Farill's store names tester runs "manual"
-export const isContestant = (r: RunRecord) => !/^(scripted|human|manual|curl)/.test(r.agent_name) && !r.agent_name.includes("smoke") && r.steps_used > 0;
+export const isContestant = (r: RunRecord) => !/^(scripted|human|manual|curl)/.test(r.agent_name) && !r.agent_name.includes("smoke");
 
 export interface Cell {
   runs: number;
@@ -69,6 +48,7 @@ export interface Cell {
 }
 
 export function cell(runs: RunRecord[]): Cell {
+  runs = runs.filter((run) => run.resolved_at !== null);
   const claimed = runs.filter((r) => r.agent_claimed_success);
   return {
     runs: runs.length,
@@ -99,6 +79,7 @@ export interface Quadrants {
 }
 
 export function quadrants(runs: RunRecord[]): Quadrants {
+  runs = runs.filter((run) => run.resolved_at !== null);
   const n = (c: boolean, g: boolean) => runs.filter((r) => r.agent_claimed_success === c && r.ground_truth_success === g).length;
   return { genuine: n(true, true), falseSuccess: n(true, false), honestFail: n(false, false), silentSuccess: n(false, true) };
 }
@@ -119,6 +100,27 @@ export async function loadResults(): Promise<{ runs: RunRecord[]; source: string
     }
   }
   return { runs: [], source: "none" };
+}
+
+export async function loadLiveResults({ base = "", signal, allowRecorded = true }: { base?: string; signal?: AbortSignal; allowRecorded?: boolean } = {}): Promise<{ runs: RunRecord[]; source: string }> {
+  const fetchRuns = async (source: string) => {
+    const response = await fetch(source, { signal, cache: "no-store" });
+    if (!response.ok) throw new Error(`${source} returned ${response.status}`);
+    const runs: unknown = await response.json();
+    if (!Array.isArray(runs) || !runs.every(isBenchmarkRun)) throw new Error(`${source} returned an unsupported run format.`);
+    return { runs, source };
+  };
+  try {
+    return await fetchRuns(`${base.replace(/\/$/, "")}${API_FALLBACK}`);
+  } catch (cause) {
+    if (!allowRecorded || signal?.aborted) throw cause;
+    // fall through to the pilot export below
+    try {
+      return await fetchRuns(RESULTS_URL);
+    } catch {
+      throw cause;
+    }
+  }
 }
 
 export function steelRecordingUrl(sessionId: string) {

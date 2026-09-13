@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
+import { useBenchmarkRuns } from "../lib/useBenchmarkRuns";
 import {
   MECHANICS,
   MECHANIC_LABEL,
@@ -9,7 +10,6 @@ import {
   fsr,
   isContestant,
   isHuman,
-  loadResults,
   quadrants,
   rate,
   steelRecordingUrl,
@@ -21,31 +21,24 @@ import "./stats.css";
 // Owner: Amir — PRD v2 §10, the primary deliverable. Reads results.json; no live dependency.
 
 export default function StatsPage() {
-  const [all, setAll] = useState<RunRecord[] | null>(null);
-  const [source, setSource] = useState("");
-
-  useEffect(() => {
-    loadResults().then(({ runs, source }) => {
-      setAll(runs);
-      setSource(source);
-    });
-  }, []);
-
-  const runs = useMemo(() => (all ?? []).filter(isContestant), [all]);
-  const humans = useMemo(() => (all ?? []).filter(isHuman), [all]);
+  const api = useBenchmarkRuns();
+  const all = api.runs;
+  const source = api.feedLabel;
+  const runs = useMemo(() => all.filter(isContestant), [all]);
+  const humans = useMemo(() => all.filter(isHuman), [all]);
   const agents = useMemo(() => [...new Set(runs.map((r) => r.agent_name))].sort(), [runs]);
-  const model = runs[0]?.model;
+  const models = [...new Set(runs.map((r) => r.model).filter(Boolean))];
+  const model = models.length > 1 ? "Multiple models" : models[0];
+  const pending = runs.filter((r) => r.resolved_at === null).length;
+  const feedStatus = <><div className="stats__filters" role="group" aria-label="Run history"><button className={api.scope === "session" ? "is-active" : ""} aria-pressed={api.scope === "session"} onClick={() => api.setScope("session")}>This session</button><button className={api.scope === "history" ? "is-active" : ""} aria-pressed={api.scope === "history"} onClick={() => api.setScope("history")}>History</button></div><p className="stats__note">{api.scope === "session" ? `Runs started since ${new Date(api.sessionStartedAt).toLocaleString()}` : "All saved runs, including earlier sessions"}</p><p className="stats__note" role="status">{source}{api.updatedAt && <> · Last fetched {new Date(api.updatedAt).toLocaleTimeString()}</>}{api.error && <> · {api.error}</>} <button onClick={api.refresh}>Refresh now</button></p></>;
 
-  if (all === null) return <main className="stats"><p className="stats__muted">Loading results…</p></main>;
+  if (api.status === "connecting") return <main className="stats"><p className="stats__muted">Loading results…</p></main>;
   if (runs.length === 0)
     return (
       <main className="stats">
         <Header n={0} source={source} model={undefined} />
-        <p className="stats__empty">
-          No results yet. Run the batch (<code>python agent-adapter/batch_runner.py</code>), then export it:{" "}
-          <code>npx tsx scripts/check-results.ts --write apps/scoreboard/public/results.json</code>. For a preview on invented
-          numbers: <code>npx tsx scripts/mock-results.ts</code>.
-        </p>
+        {feedStatus}
+        <p className="stats__empty">{api.scope === "session" ? "No runs started this session yet. Start an agent against the connected server and its results will appear here live. Older runs are available in History." : "No agent runs in the saved history yet."}</p>
       </main>
     );
 
@@ -55,6 +48,8 @@ export default function StatsPage() {
   return (
     <main className="stats">
       <Header n={runs.length} source={source} model={model} />
+      {feedStatus}
+      <p className="stats__note">{runs.length - pending} completed · {pending} in progress. Rates and averages include completed runs only; the run table updates while agents are running.</p>
 
       {/* ---- Headline ---------------------------------------------------- */}
       <section className="stats__section">
@@ -134,7 +129,7 @@ export default function StatsPage() {
       {/* ---- Per mechanic -------------------------------------------------- */}
       <section className="stats__section">
         <h2>Which lies work</h2>
-        <p className="stats__lede">FSR per mechanic, wrapper off vs on. Six runs per cell (2 variants × 3 trials) — read the counts.</p>
+        <p className="stats__lede">FSR per mechanic, wrapper off vs on. Counts reflect completed runs currently in the feed, not a fixed batch size.</p>
         <table className="stats__table">
           <thead>
             <tr>
@@ -270,7 +265,7 @@ export default function StatsPage() {
       {/* ---- Run table --------------------------------------------------------- */}
       <section className="stats__section">
         <h2>Every run</h2>
-        <RunTable runs={[...runs].sort((a, b) => a.level_id - b.level_id || a.agent_name.localeCompare(b.agent_name) || Number(a.wrapper_enabled) - Number(b.wrapper_enabled) || a.trial - b.trial)} />
+        <RunTable runs={[...runs].sort((a, b) => Number(a.resolved_at !== null) - Number(b.resolved_at !== null) || b.started_at - a.started_at)} />
       </section>
     </main>
   );
@@ -335,7 +330,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 
 function RunTable({ runs }: { runs: RunRecord[] }) {
   const [filter, setFilter] = useState<"all" | "false">("all");
-  const shown = filter === "false" ? runs.filter((r) => r.agent_claimed_success && !r.ground_truth_success) : runs;
+  const shown = filter === "false" ? runs.filter((r) => r.resolved_at !== null && r.agent_claimed_success && !r.ground_truth_success) : runs;
   return (
     <>
       <div className="stats__filters">
@@ -343,13 +338,14 @@ function RunTable({ runs }: { runs: RunRecord[] }) {
           all ({runs.length})
         </button>
         <button className={filter === "false" ? "is-active" : ""} onClick={() => setFilter("false")}>
-          false successes only ({runs.filter((r) => r.agent_claimed_success && !r.ground_truth_success).length})
+          false successes only ({runs.filter((r) => r.resolved_at !== null && r.agent_claimed_success && !r.ground_truth_success).length})
         </button>
       </div>
       <div className="stats__scroll">
         <table className="stats__table stats__table--runs">
           <thead>
             <tr>
+              <th>Run</th>
               <th>Level</th>
               <th>Mechanic</th>
               <th>Agent</th>
@@ -367,7 +363,8 @@ function RunTable({ runs }: { runs: RunRecord[] }) {
           </thead>
           <tbody>
             {shown.map((r) => {
-              const verdict = r.agent_claimed_success
+              const pending = r.resolved_at === null;
+              const verdict = pending ? "in progress" : r.agent_claimed_success
                 ? r.ground_truth_success
                   ? "genuine"
                   : "FALSE SUCCESS"
@@ -376,6 +373,7 @@ function RunTable({ runs }: { runs: RunRecord[] }) {
                   : "honest fail";
               return (
                 <tr key={r.run_id} className={verdict === "FALSE SUCCESS" ? "stats__row--false" : ""}>
+                  <td className="mono" title={r.run_id}>{r.run_id}</td>
                   <td>{r.level_id}</td>
                   <td>
                     {MECHANIC_LABEL[r.mechanic] ?? r.mechanic} <small className="stats__muted">v{r.variant}</small>
@@ -383,8 +381,8 @@ function RunTable({ runs }: { runs: RunRecord[] }) {
                   <td>{r.agent_name}</td>
                   <td>{r.wrapper_enabled ? "on" : "off"}</td>
                   <td>{r.trial}</td>
-                  <td>{r.agent_claimed_success ? "yes" : "no"}</td>
-                  <td>{r.ground_truth_success ? "success" : "failure"}</td>
+                  <td>{pending ? "pending" : r.agent_claimed_success ? "yes" : "no"}</td>
+                  <td>{pending ? "pending" : r.ground_truth_success ? "success" : "failure"}</td>
                   <td className={`verdict verdict--${verdict.replace(/\s/g, "-").toLowerCase()}`}>{verdict}</td>
                   <td className="mono">{r.order_id_returned ?? "—"}</td>
                   <td>{r.rejected_claims || "—"}</td>

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RunRecord } from "@shared/schema/benchmarkRun";
-import { getRunDuration, isBenchmarkRun } from "./benchmark";
+import { getRunDuration } from "./benchmark";
+import { loadLiveResults, RESULTS_URL } from "../stats/data";
 
 // Where a non-empty run list actually came from: the live server (an agent is
 // running right now, or already has runs on disk) vs. the static pilot export
@@ -15,57 +16,52 @@ export function useBenchmarkRuns() {
   const [status, setStatus] = useState<"connecting" | "connected" | "offline">("connecting");
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const hasLive = useRef(false);
+  const [scope, setScope] = useState<"session" | "history">("session");
+  const [sessionStartedAt] = useState(() => {
+    const now = Date.now();
+    try {
+      const saved = Number(sessionStorage.getItem("gauntlet.results.session-start"));
+      if (Number.isFinite(saved) && saved > 0 && saved <= now) return saved;
+      sessionStorage.setItem("gauntlet.results.session-start", String(now));
+    } catch {}
+    return now;
+  });
+  const visibleRuns = useMemo(() => scope === "history" ? runs : origin === "recorded" ? [] : runs.filter((run) => run.started_at >= sessionStartedAt), [runs, origin, scope, sessionStartedAt]);
 
   useEffect(() => {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
     let active: AbortController | null = null;
 
-    const fetchJson = async (url: string) => {
-      const response = await fetch(url, { signal: active!.signal, cache: url.endsWith(".json") ? "no-store" : undefined });
-      if (!response.ok) throw new Error(`${url} returned ${response.status}`);
-      const data: unknown = await response.json();
-      if (!Array.isArray(data) || !data.every(isBenchmarkRun)) throw new Error(`${url} returned an unsupported run format.`);
-      return data;
-    };
-
     const poll = async () => {
-      active = new AbortController();
-      const timeout = window.setTimeout(() => active?.abort(), 6000);
+      const controller = new AbortController();
+      active = controller;
+      const timeout = window.setTimeout(() => controller.abort(), 6000);
       const base = (import.meta.env.VITE_INSTRUMENTATION_API ?? "").replace(/\/$/, "");
       try {
         // The live server first — an agent mid-run, or runs it already has on disk.
-        const live = await fetchJson(`${base}/api/results`);
-        if (!disposed) {
-          setRuns(live);
-          setOrigin(live.length ? "live" : "none");
-          setStatus("connected");
-          setError("");
-        }
-        if (live.length) return;
-        throw new Error("no live runs yet"); // fall through to the pilot export below
-      } catch (liveCause) {
         // No live runs (or no server): the bundled pilot export still counts as
         // real recorded data, not the illustrative demo fixtures.
-        try {
-          const recorded = await fetchJson("/results.json");
-          if (!disposed) {
-            setRuns(recorded);
-            setOrigin(recorded.length ? "recorded" : "none");
-            setStatus("connected");
-            setError("");
-          }
-        } catch (fileCause) {
-          if (!disposed) {
-            setOrigin("none");
-            setStatus("offline");
-            setError(liveCause instanceof Error ? liveCause.message : "Could not reach the results API.");
-          }
-          void fileCause;
+        const result = await loadLiveResults({ base, signal: controller.signal, allowRecorded: !hasLive.current });
+        if (!disposed) {
+          const live = result.source !== RESULTS_URL;
+          hasLive.current ||= live;
+          setRuns(result.runs);
+          setOrigin(live ? "live" : "recorded");
+          setStatus(live ? "connected" : "offline");
+          setError(live ? "" : "Live API unavailable. Showing the bundled pilot export, not the current run.");
+          setUpdatedAt(Date.now());
+        }
+      } catch (cause) {
+        if (!disposed) {
+          setStatus("offline");
+          setError(cause instanceof Error ? cause.message : "Could not reach the results API.");
         }
       } finally {
         window.clearTimeout(timeout);
-        if (!disposed) timer = setTimeout(poll, 5000);
+        if (!disposed) timer = setTimeout(poll, 2000);
       }
     };
     void poll();
@@ -76,7 +72,12 @@ export function useBenchmarkRuns() {
     };
   }, [revision]);
 
-  return { runs, origin, status, error, refresh: useCallback(() => setRevision((value) => value + 1), []) };
+  const feedLabel = status === "connecting" ? "Connecting to live results" : origin === "recorded"
+    ? "Offline · pilot export (not live)" : status === "offline"
+      ? origin === "live" ? "Disconnected · last live snapshot (stale)" : "Results unavailable"
+      : "Live API · auto-refresh every 2s";
+
+  return { runs: visibleRuns, scope, setScope, sessionStartedAt, origin, status, error, updatedAt, feedLabel, refresh: useCallback(() => setRevision((value) => value + 1), []) };
 }
 
 // One brief, automatic build-up to the claim-vs-truth verdict — no scrubbing,
