@@ -16,6 +16,7 @@ export function useBenchmarkRuns() {
   const [status, setStatus] = useState<"connecting" | "connected" | "offline">("connecting");
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
+  const refresh = useCallback(() => setRevision((value) => value + 1), []);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const hasLive = useRef(false);
   const [scope, setScope] = useState<"session" | "history">("session");
@@ -72,12 +73,24 @@ export function useBenchmarkRuns() {
     };
   }, [revision]);
 
+  useEffect(() => {
+    const refreshVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("focus", refreshVisible);
+    document.addEventListener("visibilitychange", refreshVisible);
+    return () => {
+      window.removeEventListener("focus", refreshVisible);
+      document.removeEventListener("visibilitychange", refreshVisible);
+    };
+  }, [refresh]);
+
   const feedLabel = status === "connecting" ? "Connecting to live results" : origin === "recorded"
     ? "Offline · pilot export (not live)" : status === "offline"
       ? origin === "live" ? "Disconnected · last live snapshot (stale)" : "Results unavailable"
       : "Live API · auto-refresh every 2s";
 
-  return { runs: visibleRuns, scope, setScope, sessionStartedAt, origin, status, error, updatedAt, feedLabel, refresh: useCallback(() => setRevision((value) => value + 1), []) };
+  return { runs: visibleRuns, scope, setScope, sessionStartedAt, origin, status, error, updatedAt, feedLabel, refresh };
 }
 
 // One brief, automatic build-up to the claim-vs-truth verdict — no scrubbing,

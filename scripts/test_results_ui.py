@@ -47,6 +47,34 @@ class ResultsUITest(unittest.TestCase):
         self.page.get_by_role("button", name="Results", exact=True).click()
         return self.page.get_by_role("dialog", name="The confidence gap")
 
+    def delay_polling(self):
+        self.page.add_init_script("""(() => {
+            const schedule = window.setTimeout.bind(window);
+            window.setTimeout = (callback, delay, ...args) => schedule(callback, delay === 2000 ? 60000 : delay, ...args);
+        })();""")
+        self.page.reload()
+        expect(self.page.get_by_role("button", name="Live · 0 runs", exact=True)).to_be_visible()
+
+    def test_opening_results_and_manual_refresh_fetch_without_waiting_for_poll(self):
+        self.delay_polling()
+        self.runs = [self.new_run(resolved_at=None, claimed_at=None, agent_claimed_success=False, ground_truth_success=False)]
+        dialog = self.results()
+        expect(dialog.get_by_label("Selected run result")).to_contain_text("Agent claim: pending")
+        self.runs[0].update(resolved_at=int(time.time() * 1000), agent_claimed_success=True)
+        dialog.get_by_role("button", name="Refresh now", exact=True).click()
+        expect(dialog.get_by_label("Selected run result")).to_contain_text("False success")
+        expect(dialog.locator(".cockpit-results-table tbody tr")).to_have_count(1)
+
+    def test_returning_to_browser_refreshes_results_without_waiting_for_poll(self):
+        self.delay_polling()
+        with self.page.expect_response("**/api/results"):
+            dialog = self.results()
+        expect(dialog.locator(".cockpit-results-table tbody tr")).to_have_count(0)
+        self.runs = [self.new_run()]
+        self.page.evaluate("window.dispatchEvent(new Event('focus'))")
+        expect(dialog.get_by_label("Selected run result")).to_contain_text("Verified success")
+        expect(dialog.locator(".cockpit-results-table tbody tr")).to_have_count(1)
+
     def test_demo_preview_does_not_create_results(self):
         self.page.get_by_role("button", name="Explore the demo", exact=True).click()
         dialog = self.results()

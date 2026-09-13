@@ -128,7 +128,7 @@ export default function Cockpit() {
           <span className="cockpit-header-motto">A confident agent is not a successful agent.</span>
         </div>
         <nav className="cockpit-header-actions" aria-label="Cockpit tools">
-          <button className="cockpit-tool cockpit-results-button" onClick={() => resultsRef.current?.showModal()}><Icon name="chart" /><span>Results</span></button>
+          <button className="cockpit-tool cockpit-results-button" onClick={() => { api.refresh(); resultsRef.current?.showModal(); }}><Icon name="chart" /><span>Results</span></button>
           <button className="cockpit-tool cockpit-byoa-button" aria-label="Bring your own agent" onClick={() => byoaRef.current?.showModal()}><Icon name="link" /><span aria-hidden="true">Bring your own agent</span></button>
           <button className="cockpit-tool" aria-label="How the gauntlet works" onClick={() => helpRef.current?.showModal()}><Icon name="help" /></button>
           <button className="cockpit-tool" aria-label="Toggle fullscreen" onClick={fullscreen}><Icon name="expand" /></button>
@@ -236,7 +236,7 @@ function ResultsDialog({ api, resultsRef, selectedRunId, onSelectRun }: {
   return (
     <dialog className="cockpit-dialog" ref={resultsRef} aria-labelledby="cockpit-results-title">
       <div className="cockpit-dialog-heading"><div><span className="cockpit-eyebrow">Recorded benchmark results</span><h2 id="cockpit-results-title">The confidence gap</h2></div><button className="cockpit-icon-button" aria-label="Close results" onClick={() => resultsRef.current?.close()}><Icon name="close" /></button></div>
-      <p role="status">{api.feedLabel}{api.updatedAt && <> · Last fetched {new Date(api.updatedAt).toLocaleTimeString()}</>}{api.error && <> · {api.error}</>}</p>
+      <p role="status">{api.feedLabel}{api.updatedAt && <> · Last fetched {new Date(api.updatedAt).toLocaleTimeString()}</>}{api.error && <> · {api.error}</>} <button className="cockpit-action" onClick={api.refresh}>Refresh now</button></p>
       <p>Only recorded agent runs appear here. Exploring the demo or selecting a sector does not run an agent or create results.</p>
       <div className="cockpit-data-toggle" role="group" aria-label="Run history"><button aria-pressed={api.scope === "session"} onClick={() => api.setScope("session")}>This session</button><button aria-pressed={api.scope === "history"} onClick={() => api.setScope("history")}>History</button></div>
       <p>{api.scope === "session" ? `Runs started since ${new Date(api.sessionStartedAt).toLocaleString()}` : "All saved runs, including earlier sessions"}</p>
