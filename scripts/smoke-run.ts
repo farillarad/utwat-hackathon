@@ -77,7 +77,6 @@ async function main() {
   await post(`/api/runs/${run_id}/end`, {});
   const final = await (await fetch(`${API}/api/runs/${run_id}`)).json();
   console.log(JSON.stringify(final.levels, null, 1));
-  console.log(`export with: npx tsx scripts/export-run.ts ${run_id}`);
 }
 
 main().catch((e) => {

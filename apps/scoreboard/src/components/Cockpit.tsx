@@ -64,6 +64,22 @@ export default function Cockpit() {
   const sampleMode = source === "demo";
 
   const chooseLevel = (id: number) => { setLevelId(id); setRunChoice(""); };
+  // "Explore the demo" has to visibly do something even when the current
+  // agent/test/shield selection is the reason nothing's showing — so it
+  // doesn't just flip the data source and hope the existing selection
+  // happens to line up, it jumps to a specific combo guaranteed to be in
+  // DEMO_RUNS: level 5 (optimistic UI) is the PRD's own demo beat (§18) —
+  // both agents fall for it wrapper-off, a legible, dramatic false success.
+  // Changing levelId/agent/wrapper puts a genuinely new run in front of
+  // useFlightReplay, whose own effect (keyed on run.run_id) then starts
+  // playback — no separate "start" call needed here.
+  const exploreDemo = () => {
+    setSource("demo");
+    setAgent("browser-use");
+    setLevelId(5);
+    setWrapper(false);
+    setRunChoice("");
+  };
   const selectRun = (selected: RunRecord) => {
     setAgent(selected.agent_name);
     setWrapper(selected.wrapper_enabled);
@@ -138,7 +154,7 @@ export default function Cockpit() {
 
       <main className="cockpit-flight" aria-label="Gauntlet replay">
         <FlightTarget progress={replay.progress} outcome={outcome} level={levelId} step={actions} hasRun={!!run} />
-        {!run && <div className="cockpit-no-run"><span className="cockpit-eyebrow">No telemetry</span><h3>No recorded run</h3><p>{api.status === "offline" ? "The results feed is unavailable." : "No run matches this agent, test, and verification setting."}</p><button className="cockpit-action" onClick={() => setSource("demo")}>Explore the demo</button></div>}
+        {!run && <div className="cockpit-no-run"><span className="cockpit-eyebrow">No telemetry</span><h3>No recorded run</h3><p>{api.status === "offline" ? "The results feed is unavailable." : "No run matches this agent, test, and verification setting."}</p><button className="cockpit-action" onClick={exploreDemo}>Explore the demo</button></div>}
       </main>
 
       <section className="cockpit-verdict" aria-live="polite" aria-atomic="true">

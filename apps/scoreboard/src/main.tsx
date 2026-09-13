@@ -5,7 +5,7 @@ import StatsPage from "./stats/StatsPage";
 import "./styles.css";
 import "./cockpit.css";
 
-// Two pages, one app (PRD v2 §20): "/" is the game view / live board, "/stats" is the
+// Two pages, one app (PRD v2 §20): "/" is the Cockpit game view, "/stats" is the
 // stats page (§10). No router dependency — a path check is enough for two routes.
 const Page = window.location.pathname.startsWith("/stats") ? StatsPage : App;
 
