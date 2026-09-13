@@ -1,5 +1,7 @@
 # Agent Stress-Test Gauntlet — PRD
 
+> **⚠️ Superseded by [PRD-v2.md](PRD-v2.md).** This is the v1 plan (6-level ladder, Ladder Score, failure-mode classifier). Kept for reference only — don't build from it.
+
 **Event:** Battle of the Schools (web agents theme, ML component required)
 **Team:** Georgio, Tanay, Farill, Amir
 **Duration:** 24 hours
