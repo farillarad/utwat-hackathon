@@ -17,6 +17,7 @@ const API = process.env.GAUNTLET_SERVER ?? process.env.PUBLIC_URL ?? "http://loc
 
 interface Run {
   run_id: string;
+  started_at?: number;
   agent_name: string;
   model: string;
   level_id: number;
@@ -99,8 +100,23 @@ async function load(): Promise<Run[]> {
 async function main() {
   const loaded = await load();
   // Pre-v2 records (no level_id) can linger in data/runs from earlier sessions; ignore them.
-  const all = loaded.filter((r) => typeof r.level_id === "number");
-  if (all.length !== loaded.length) console.log(`(skipping ${loaded.length - all.length} pre-v2 record(s))`);
+  const v2 = loaded.filter((r) => typeof r.level_id === "number");
+  if (v2.length !== loaded.length) console.log(`(skipping ${loaded.length - v2.length} pre-v2 record(s))`);
+
+  // --since <epoch ms>: only the batch, not pilot/dev runs that came before it.
+  const since = Number(flag("since") ?? 0);
+  const recent = since ? v2.filter((r) => (r.started_at ?? 0) >= since) : v2;
+  if (since) console.log(`--since ${since} (${new Date(since).toISOString()}): dropped ${v2.length - recent.length} earlier record(s)`);
+
+  // One run per slot (agent, level, trial, wrapper): a rerun replaces the earlier attempt.
+  const bySlot = new Map<string, Run>();
+  for (const r of recent) {
+    const k = `${r.agent_name}|${r.level_id}|${r.trial}|${r.wrapper_enabled}`;
+    const prev = bySlot.get(k);
+    if (!prev || (r.started_at ?? 0) > (prev.started_at ?? 0)) bySlot.set(k, r);
+  }
+  const all = [...bySlot.values()];
+  if (all.length !== recent.length) console.log(`one-run-per-slot: dropped ${recent.length - all.length} duplicate slot(s), kept the most recent`);
   const runs = all.filter((r) => !isNonAgent(r));
   const humans = all.filter((r) => /^(human|manual)/.test(r.agent_name));
   const expect = Number(flag("expect") ?? 0);
@@ -160,7 +176,22 @@ async function main() {
     console.log(`\nwrote ${all.length} records -> ${out}`);
   }
 
-  const ok = bad === 0 && (!expect || runs.length >= expect);
+  if (expect) {
+    const want = new Set<string>();
+    for (const a of ["browser-use", "raw-llm-loop"]) for (let l = 1; l <= 12; l++) for (let t = 1; t <= 3; t++) for (const w of [false, true]) want.add(`${a}|${l}|${t}|${w}`);
+    for (const r of runs) want.delete(`${r.agent_name}|${r.level_id}|${r.trial}|${r.wrapper_enabled}`);
+    if (want.size) {
+      console.log(`
+MISSING ${want.size} slot(s):`);
+      for (const k of [...want].sort()) {
+        const [a, l, t, w] = k.split("|");
+        console.log(`  ${a} L${l} t${t} wrapper ${w === "true" ? "on" : "off"}`);
+      }
+    } else console.log(`
+all ${expect} slots present, no duplicates`);
+  }
+
+  const ok = bad === 0 && (!expect || runs.length === expect);
   console.log(ok ? "\nT7 PASS" : "\nT7 FAIL");
   process.exit(ok ? 0 : 1);
 }

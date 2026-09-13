@@ -1,0 +1,15 @@
+agent=raw-llm-loop model=claude-sonnet-4-5 wrapper=False steel=True base=https://treasurer-knows-ide-relationship.trycloudflare.com
+
+--- level 8  run 9amipOY0yiBA  steel 41cbf7b9-ef3a-41be-a95c-88e42f11fb04  https://app.steel.dev/sessions/41cbf7b9-ef3a-41be-a95c-88e42f11fb04
+   2 type   'name' = 'Alex Chen'
+   3 type   'address' = '220 Yonge Street'
+   4 type   'unit' = 'Unit 4'
+   5 type   'city' = 'Toronto'
+   6 type   'zip' = 'M5B2H1'
+   7 type   'phone' = '416-555-0142'
+   8 click  'on'
+   9 click  'Complete order'
+  10 done   success=True order_id='ORD-A75793D7'
+  steps=10 cost=$0.2115 rejected_claims=0
+  [raw-llm-loop] level 8 run 9amipOY0yiBA: claimed=True order_id='ORD-A75793D7' -> genuine pass
+BATCH: using key..XgAA

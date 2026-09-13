@@ -105,12 +105,19 @@ def main() -> int:
     p.add_argument("--max-steps", type=int, default=40)
     p.add_argument("--run-timeout", type=int, default=600, help="seconds before a run is killed")
     p.add_argument("--pilot", action="store_true", help="T6 pilot: 12 x browser-use x 1 trial wrapper-off + 2 wrapper-on")
+    p.add_argument("--key-index", type=int, default=None,
+                   help="use only the Nth key (0-based) from ANTHROPIC_API_KEYS — for splitting the batch by person/levels")
     p.add_argument("--local", action="store_true", help="local headless Chromium instead of Steel (dev only)")
     p.add_argument("--dry-run", action="store_true")
     args = p.parse_args()
 
     jobs = plan(args)
     keys = api_keys()
+    if args.key_index is not None:
+        if not 0 <= args.key_index < len(keys):
+            print(f"--key-index {args.key_index} out of range (have {len(keys)} key(s))", file=sys.stderr)
+            return 2
+        keys = [keys[args.key_index]]
     est_per_run = 0.18  # measured in the pilot (§9.2): $0.16 browser-use, $0.20 raw loop
     print(f"{len(jobs)} runs, parallel={args.parallel}, steel={not args.local}, base={public_url()}")
     print(f"est. cost ~${len(jobs) * est_per_run:.0f} total across {len(keys)} key(s) "
