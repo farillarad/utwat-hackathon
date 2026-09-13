@@ -36,6 +36,19 @@ HERE = Path(__file__).parent
 RUNNERS = {"browser-use": "browser_use_runner.py", "raw-llm-loop": "raw_llm_loop.py"}
 
 
+def api_keys() -> list[str]:
+    """Anthropic keys to spread the batch across. ANTHROPIC_API_KEYS=key1,key2,key3 in .env
+    (falls back to the single ANTHROPIC_API_KEY). Runs are dealt round-robin, so the cost
+    splits evenly: three keys -> each pays about a third of the batch."""
+    multi = [k.strip() for k in os.environ.get("ANTHROPIC_API_KEYS", "").split(",") if k.strip()]
+    single = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    return multi or ([single] if single else [])
+
+
+def key_label(key: str) -> str:
+    return f"key..{key[-4:]}"
+
+
 @dataclass(frozen=True)
 class Job:
     agent: str
@@ -66,13 +79,15 @@ def plan(args) -> list[Job]:
     return [Job(a, l, t, w) for a, w, l, t in itertools.product(args.agents, wrappers, levels, range(1, args.trials + 1))]
 
 
-def run_job(job: Job, args, log_dir: Path) -> tuple[Job, int, float, str]:
+def run_job(job: Job, args, log_dir: Path, key: str) -> tuple[Job, int, float, str]:
     log = log_dir / f"{job.agent}_L{job.level}_t{job.trial}_{'wrap' if job.wrapper else 'off'}.log"
     t0 = time.time()
     with open(log, "w", encoding="utf-8") as fh:
+        fh.write(f"BATCH: using {key_label(key)}\n")
         try:
             proc = subprocess.run(job.cmd(not args.local, args.max_steps), stdout=fh, stderr=subprocess.STDOUT,
-                                  timeout=args.run_timeout, cwd=HERE, env={**os.environ, "PYTHONIOENCODING": "utf-8"})
+                                  timeout=args.run_timeout, cwd=HERE,
+                                  env={**os.environ, "PYTHONIOENCODING": "utf-8", "ANTHROPIC_API_KEY": key})
             code = proc.returncode
         except subprocess.TimeoutExpired:
             fh.write(f"\nBATCH: killed after {args.run_timeout}s\n")
@@ -95,16 +110,20 @@ def main() -> int:
     args = p.parse_args()
 
     jobs = plan(args)
+    keys = api_keys()
+    est_per_run = 0.18  # measured in the pilot (§9.2): $0.16 browser-use, $0.20 raw loop
     print(f"{len(jobs)} runs, parallel={args.parallel}, steel={not args.local}, base={public_url()}")
+    print(f"est. cost ~${len(jobs) * est_per_run:.0f} total across {len(keys)} key(s) "
+          f"(~${len(jobs) * est_per_run / max(1, len(keys)):.0f} each): {', '.join(key_label(k) for k in keys) or 'NONE'}")
     if args.dry_run:
-        for j in jobs:
-            print("  " + j.label())
+        for i, j in enumerate(jobs):
+            print(f"  {j.label()}  {key_label(keys[i % len(keys)]) if keys else ''}")
         return 0
     if not args.local and not os.environ.get("STEEL_API_KEY"):
         print("STEEL_API_KEY not set (use --local for a dev run)", file=sys.stderr)
         return 2
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("ANTHROPIC_API_KEY not set", file=sys.stderr)
+    if not keys:
+        print("no Anthropic key: set ANTHROPIC_API_KEYS=k1,k2,k3 or ANTHROPIC_API_KEY", file=sys.stderr)
         return 2
 
     log_dir = HERE.parent / "data" / "batch-logs" / time.strftime("%Y%m%d-%H%M%S")
@@ -112,7 +131,7 @@ def main() -> int:
     t0 = time.time()
     failures = 0
     with ThreadPoolExecutor(max_workers=args.parallel) as pool:
-        futures = [pool.submit(run_job, j, args, log_dir) for j in jobs]
+        futures = [pool.submit(run_job, j, args, log_dir, keys[i % len(keys)]) for i, j in enumerate(jobs)]
         for i, fut in enumerate(as_completed(futures), 1):
             job, code, secs, log = fut.result()
             status = "ok " if code == 0 else f"exit {code}"
