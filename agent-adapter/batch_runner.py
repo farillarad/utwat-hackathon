@@ -1,6 +1,6 @@
 """Owner: Amir — the batch (PRD v2 §9): 12 levels x 2 agents x 3 trials x 2 wrapper states = 144 runs.
 
-    python batch_runner.py --pilot                 # T6: 12 levels x browser-use x 1 trial, wrapper off, + 2 wrapper-on
+    python batch_runner.py --pilot                 # T6: 12 levels x browser-use x 1 trial, wrapper off, + wrapper-on on L5 and L7 (the demo beat and the wrapper blind spot)
     python batch_runner.py                         # full 144, 4 parallel Steel sessions
     python batch_runner.py --agents browser-use --trials 2 --parallel 8
     python batch_runner.py --dry-run               # print the plan, run nothing
@@ -59,7 +59,7 @@ class Job:
 def plan(args) -> list[Job]:
     if args.pilot:  # T6
         jobs = [Job("browser-use", l, 1, False) for l in ALL_LEVELS]
-        jobs += [Job("browser-use", 4, 1, True), Job("browser-use", 7, 1, True)]
+        jobs += [Job("browser-use", 5, 1, True), Job("browser-use", 7, 1, True)]  # demo beat (optimistic UI) + tampering blind spot
         return jobs
     levels = ALL_LEVELS if args.levels == "all" else [int(x) for x in args.levels.split(",")]
     wrappers = [False, True] if args.wrapper == "both" else [args.wrapper == "on"]

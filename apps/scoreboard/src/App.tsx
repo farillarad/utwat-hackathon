@@ -1,5 +1,6 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import ComparisonBoard from "./components/ComparisonBoard";
+import GameView from "./gameview/GameView";
 import { useRunStream } from "./ws/useRunStream";
 import { useNow } from "./lib/useNow";
 import Cockpit from "./components/Cockpit";
@@ -21,6 +22,7 @@ function LegacyBoard() {
   const { runs, connection, dismiss, clearAll } = useRunStream();
   // Newest runs win the screen; older ones are still in memory and reappear when a row is dismissed.
   const visible = runs.slice(-MAX_ROWS);
+  const [view, setView] = useState<"live" | "game">("live");
 
   // Session-level silkscreen readouts — display only, computed from data
   // useRunStream already exposes; no new data flow.
@@ -28,6 +30,19 @@ function LegacyBoard() {
   const sessionIdRef = useRef(Math.random().toString(36).slice(2, 7).toUpperCase());
   const now = useNow();
   const totalEvents = runs.reduce((sum, r) => sum + r.events.length, 0);
+
+  if (view === "game") {
+    return (
+      <div className="board board--game">
+        <div className="board__game-bar">
+          <button className="btn btn--quiet" onClick={() => setView("live")}>
+            ← Live board
+          </button>
+        </div>
+        <GameView />
+      </div>
+    );
+  }
 
   return (
     <div className="board">
@@ -37,6 +52,9 @@ function LegacyBoard() {
           <h1>Gauntlet</h1>
         </div>
         <div className="board__actions">
+          <button className="btn" onClick={() => setView("game")}>
+            Game view
+          </button>
           {runs.length > 0 && (
             <button className="btn btn--quiet" onClick={clearAll}>
               Clear board

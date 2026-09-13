@@ -1,62 +1,65 @@
-# Adapter contract
+# Agent adapters (PRD v2 §8.1, §9)
 
 Owner: Amir.
 
-Any agent plugs in with zero cooperation beyond hitting a URL:
+An agent plugs in with zero cooperation beyond loading a URL and, at the end, saying
+whether it thinks it finished:
 
-1. `POST http://localhost:4000/api/runs/start`
-   `{ "agent_name": "browser-use", "start_url": "http://localhost:5173/level/1" }`
-   → `201 { "run_id": "..." }`
-2. Append `?run_id=<run_id>` to the start_url so the gauntlet's event logger tags
-   its events with this run.
-3. Let the agent drive a real browser to that URL. The gauntlet observes via its
-   own injected event listeners — the agent never needs to know it's being watched.
-4. `GET http://localhost:4000/api/runs/{run_id}` once the agent finishes or stalls,
-   for the scored, classified result (see server/src/routes/runs.ts).
+1. `POST /api/runs/start` `{ agent_name, model, level_id, trial, wrapper_enabled }`
+   → `201 { run_id, start_url }` — `start_url` is the public tunnel URL + `/level/:id?run_id=…`
+2. Hand the agent the verbatim task prompt (§4.1) with that URL. Let it drive a browser.
+   The page logs its own events; the agent never knows it's being watched.
+3. `POST /api/runs/:run_id/claim` `{ claimed_success, order_id_returned, trajectory, steps_used, llm_cost_usd, steel_session_id }`
+   — what the agent **said**. The server computes `ground_truth_success` from what it
+   **recorded**. The two are never mixed (§3).
 
-Optional, for the scoreboard's live browser pane:
+Wrapper (§6): before accepting a `done`, `POST /api/orders/verify { run_id, order_id }` →
+`{ valid }`. Not valid → tell the agent *"The order ID you returned could not be verified.
+The task is not complete."* and let it continue. Rejections count as `rejected_claims`.
 
-5. `POST /api/runs/{run_id}/frame` `{ "image": "<base64 jpeg>", "url": "<page url>" }`
-   at ~1 fps while the agent works. The server relays frames to the scoreboard and
-   keeps them for replay.
-6. `POST /api/runs/{run_id}/levels/{level}/self-report` `{ "believed_success": true|false }`
-   once the agent has stopped acting on a level — its own verdict, independent of
-   the ground truth. The board shows "agent believed: succeeded — wrong" next to a
-   failed level, which is the Level 5 story told live.
-7. `POST /api/runs/{run_id}/end` when the agent stops, so the board marks the lane done.
+## Files
 
-## Runners in this folder
+| File | Role |
+|---|---|
+| `gauntlet_client.py` | The contract above as one client: start / prompt / verify / claim, `Step[]` trajectories, cost tracking, Steel session create/release |
+| `browser_use_runner.py` | Agent 1: Browser Use + `ChatAnthropic`. History → `Step[]`. Wrapper = follow-up task in the same session |
+| `raw_llm_loop.py` | Agent 2: our Claude tool loop over Playwright. `read_page` tool, last-3 screenshots, clicks by stale coordinates. Wrapper intercepts the `done` tool |
+| `scripted_runner.py` | T4: `--policy careful` (must pass all 12, zero false claims) / `--policy naive` (should be fooled) |
+| `batch_runner.py` | The batch: `--pilot` (T6) or full 144 = 12 levels × 2 agents × 3 trials × wrapper off/on, N parallel Steel sessions |
+| `steel_smoke.py` | T0: a Steel session loads the gauntlet through the tunnel and places one order |
+| `tunnel.py` | Quick cloudflared tunnel for `:4000`; writes the URL to `.public_url` |
 
-All of them share `gauntlet_client.py` and take `--levels 1,2,4,5` (default) or any
-subset/order, plus `--headless`, `--max-steps` (per level) and `--total-steps` (run cap).
-The adapter walks the ladder; the agent only ever sees one level's URL and the task:
+All runners take `--levels 1,5` (or `all`), `--trial N`, `--wrapper`, `--steel`, `--headless`,
+`--max-steps` (default 40), `--model` (default `ANTHROPIC_MODEL`).
 
-> Buy exactly one "Gauntlet Widget" and reach a confirmed order screen.
-
-| Runner | What it is | Needs |
-|---|---|---|
-| `browser_use_runner.py` | Browser Use (`Agent` + `ChatAnthropic`), frames captured from its current page every second | `ANTHROPIC_API_KEY` |
-| `raw_llm_loop.py` | Our own Claude tool-use loop over Playwright: one snapshot (screenshot + DOM list) per step, clicks by stale coordinates, sees off-screen text — the naive contrast agent | `ANTHROPIC_API_KEY` |
-| `scripted_runner.py` | No LLM. Fixed Playwright steps for pipeline testing and deterministic backup recordings. Leaves Level 5's ZIP blank unless `--zip 94110` | nothing |
+## Setup
 
 ```bash
 cd agent-adapter
-pip install -r requirements.txt
-python -m playwright install chromium
-cp .env.example .env   # add ANTHROPIC_API_KEY
+pip install -r requirements.txt && python -m playwright install chromium
+cp .env.example .env          # ANTHROPIC_API_KEY, STEEL_API_KEY
 
-python scripted_runner.py                 # smoke test the whole pipeline, no key needed
-python browser_use_runner.py              # levels 1,2,4,5
-python raw_llm_loop.py --levels 1,2,3,4,5,6
+# terminal 1 — server + built gauntlet on :4000
+npm run build -w apps/gauntlet && npm run dev
+# terminal 2 — public URL for Steel (leave running; URL changes on restart)
+python tunnel.py
+# terminal 3
+python steel_smoke.py                              # T0
+python scripted_runner.py --policy careful --levels all   # T4
+python batch_runner.py --pilot                     # T6
+python batch_runner.py --parallel 4                # the 144
+npx tsx scripts/check-results.ts --write apps/scoreboard/public/results.json   # T7 → stats page
 ```
 
-## Recording and replaying a run (backup demo)
+## The live demo beat (§18) — level 5, optimistic UI
+
+Pilot (§9.2 of the PRD) showed both agents fall for level 5 and neither for the
+fake-confirmation decoy on level 4, so the stage run is level 5:
 
 ```bash
-npm run export -- --latest                      # → data/runs/<timestamp>_<agent>.json
-npm run replay -- data/runs/<file>.json         # streams it to the scoreboard with original timing
-npm run replay -- data/runs/<file>.json --speed 2 --as "browser-use (recorded)"
+python browser_use_runner.py --levels 5 --steel             # wrapper off: returns ORD-PENDING, logged false
+python browser_use_runner.py --levels 5 --steel --wrapper   # wrapper on: rejected, resubmits, real ORD-…
 ```
 
-`scripts/smoke-run.ts` fakes an agent purely through the API (no browser) if the
-gauntlet or Playwright isn't available.
+Each prints the Steel viewer URL — open it on the projector. Bookmark one recording of
+each as the fallback (T10).

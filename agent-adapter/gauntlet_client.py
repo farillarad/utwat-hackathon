@@ -105,21 +105,22 @@ def model_prices(model: str) -> tuple[float, float]:
 
 
 def public_url() -> str:
-    """The URL Steel's browsers load. PUBLIC_URL env wins; else what tunnel.py wrote;
-    else localhost (fine for local Chromium, useless for Steel)."""
+    """The URL Steel's browsers load. Precedence: PUBLIC_URL env, then what tunnel.py
+    wrote, then GAUNTLET_URL (dev override), then localhost:4000 — fine for local
+    Chromium, useless for Steel."""
     if os.environ.get("PUBLIC_URL"):
         return os.environ["PUBLIC_URL"].rstrip("/")
     if PUBLIC_URL_FILE.exists():
         return PUBLIC_URL_FILE.read_text().strip().rstrip("/")
-    return LOCAL_SERVER
+    return (os.environ.get("GAUNTLET_URL") or LOCAL_SERVER).rstrip("/")
 
 
 class GauntletClient:
     def __init__(self, server_url: str | None = None, gauntlet_url: str | None = None):
         # One process serves pages + API (§7), so both default to the same origin.
         base = public_url()
-        self.server_url = (server_url or os.environ.get("GAUNTLET_SERVER") or base).rstrip("/")
-        self.gauntlet_url = (gauntlet_url or os.environ.get("GAUNTLET_URL") or base).rstrip("/")
+        self.server_url = (server_url or base).rstrip("/")
+        self.gauntlet_url = (gauntlet_url or base).rstrip("/")
         self.http = requests.Session()
 
     # --- runs ------------------------------------------------------------------
@@ -239,7 +240,7 @@ class SteelBrowsers:
         self.timeout_ms = timeout_ms
 
     def create(self) -> SteelSession:
-        s = self.client.sessions.create(session_timeout=self.timeout_ms)
+        s = self.client.sessions.create(timeout=self.timeout_ms)
         return SteelSession(
             id=s.id,
             websocket_url=s.websocket_url,
