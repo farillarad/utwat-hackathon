@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { LEVELS } from "@shared/levels";
 import type { RunRecord } from "@shared/schema/benchmarkRun";
 import { DEMO_RUNS, OUTCOME_LABELS, SECTORS, agentLabel, formatTime, getOutcome, getTimeline, percent, summarizeRuns } from "../lib/benchmark";
@@ -23,7 +23,6 @@ export default function Cockpit() {
   const api = useBenchmarkRuns();
   const reducedMotion = useReducedMotion();
   const [source, setSource] = useState<"demo" | "recorded">("recorded");
-  const [resultsScope, setResultsScope] = useState<"level" | "all">("level");
   // Real data (live server or the bundled pilot export) beats illustrative
   // fixtures the moment it shows up — but only takes over once, so a viewer who
   // deliberately switches back to Demo isn't fought on the next 5s poll.
@@ -70,9 +69,6 @@ export default function Cockpit() {
   const activeOrders = run?.orders.filter((order) => order.status === "active") ?? [];
   const currentOrder = activeOrders[0];
   const sampleMode = source === "demo";
-  const resultsData = resultsScope === "level" ? data.filter((item) => item.level_id === levelId) : data;
-  const resultsAgents = [...new Set(resultsData.map((item) => item.agent_name))].sort();
-  const pendingRuns = data.filter((item) => item.resolved_at === null).sort((a, b) => b.started_at - a.started_at);
 
   const chooseLevel = (id: number) => { setLevelId(id); setRunChoice(""); };
   // "Explore the demo" has to visibly do something even when the current
@@ -93,6 +89,8 @@ export default function Cockpit() {
     setRunChoice("");
   };
   const selectRun = (selected: RunRecord) => {
+    autoSelectedRef.current = api.scope;
+    setSource("recorded");
     setAgent(selected.agent_name);
     setWrapper(selected.wrapper_enabled);
     setLevelId(selected.level_id);
@@ -168,8 +166,8 @@ export default function Cockpit() {
       </section>
 
       <aside className="cockpit-systems" aria-label="Agent and verification controls">
-        <div className="cockpit-rule-heading"><span>Vessel systems</span><small>Agent 01</small></div>
-        <label className="cockpit-agent-select"><span className="cockpit-eyebrow">Active agent</span><select aria-label="Select agent" value={selectedAgent} disabled={!agents.length} onChange={(event) => { setAgent(event.target.value); setRunChoice(""); }}>{agents.length ? agents.map((name) => <option key={name} value={name}>{agentLabel(name)}</option>) : <option value="">No agents recorded</option>}</select></label>
+        <div className="cockpit-rule-heading"><span>Vessel systems</span><small>{sampleMode ? "Simulation" : "Recorded runs"}</small></div>
+        <label className="cockpit-agent-select"><span className="cockpit-eyebrow">{sampleMode ? "Demo agent preview" : "Recorded agent"}</span><select aria-label="Select agent" value={selectedAgent} disabled={!agents.length} onChange={(event) => { setAgent(event.target.value); setRunChoice(""); }}>{agents.length ? agents.map((name) => <option key={name} value={name}>{agentLabel(name)}</option>) : <option value="">No agents recorded</option>}</select></label>
         <div className="cockpit-shield-control"><span>Verification shield</span><div className="cockpit-toggle" role="group" aria-label="Verification mode"><button aria-pressed={!wrapper} onClick={() => { setWrapper(false); setRunChoice(""); }}>OFF</button><button aria-pressed={wrapper} onClick={() => { setWrapper(true); setRunChoice(""); }}>ON</button></div></div>
         <div className="cockpit-action-meter"><span>Trace actions</span><strong>{String(actions).padStart(2, "0")} <small>/ {String(run?.trajectory.length ?? 0).padStart(2, "0")}</small></strong><div className="cockpit-meter-bars" aria-hidden="true">{Array.from({ length: 30 }, (_, i) => <i key={i} className={run && i / 30 < actions / Math.max(1, run.trajectory.length) ? "is-lit" : ""} />)}</div></div>
         <dl className="cockpit-system-readouts"><div><dt>Run cost</dt><dd>{money(run?.llm_cost_usd ?? null)}</dd></div><div><dt>Rejected claims</dt><dd>{run ? run.verify_attempts.filter((attempt) => !attempt.valid && (attempt.ts - run.started_at) / 1000 <= reveal.time).length : "—"}</dd></div></dl>
@@ -196,20 +194,7 @@ export default function Cockpit() {
       </footer>
       {toast && <div className="cockpit-toast" role="status">{toast}</div>}
 
-      <dialog className="cockpit-dialog" ref={resultsRef} aria-labelledby="cockpit-results-title">
-        <div className="cockpit-dialog-heading"><div><span className="cockpit-eyebrow">{sampleMode ? "Illustrative demo data" : "Recorded benchmark results"}</span><h2 id="cockpit-results-title">The confidence gap</h2></div><button className="cockpit-icon-button" aria-label="Close results" onClick={() => resultsRef.current?.close()}><Icon name="close" /></button></div>
-        <p role="status">{sampleMode ? "Illustrative demo data — not actual agent results." : api.feedLabel}{!sampleMode && api.updatedAt && <> · Last fetched {new Date(api.updatedAt).toLocaleTimeString()}</>}{!sampleMode && api.error && <> · {api.error}</>}</p>
-        {!sampleMode && <><div className="cockpit-data-toggle" role="group" aria-label="Run history"><button aria-pressed={api.scope === "session"} onClick={() => { api.setScope("session"); setRunChoice(""); }}>This session</button><button aria-pressed={api.scope === "history"} onClick={() => { api.setScope("history"); setRunChoice(""); }}>History</button></div><p>{api.scope === "session" ? `Runs started since ${new Date(api.sessionStartedAt).toLocaleString()}` : "All saved runs, including earlier sessions"}</p></>}
-        {run && <section aria-label="Selected run result"><h3>Selected run · Test {run.level_id} · {agentLabel(run.agent_name)}</h3><p><code>{run.run_id}</code> · Verification {run.wrapper_enabled ? "ON" : "OFF"}</p><p><strong>{OUTCOME_LABELS[outcome]}</strong> · Agent claim: {run.resolved_at === null ? "pending" : run.agent_claimed_success ? "success" : "failure"} · Server truth: {run.resolved_at === null ? "pending" : run.ground_truth_success ? "pass" : "fail"}</p></section>}
-        <label>Results scope <select aria-label="Results scope" value={resultsScope} onChange={(event) => setResultsScope(event.target.value as "level" | "all")}><option value="level">Selected test · {levelId}</option><option value="all">All tests</option></select></label>
-        <p>Verification off versus on for {resultsScope === "level" ? `test ${levelId}` : "all tests in this feed"}. Only completed runs enter the metrics. {resultsData.filter((item) => item.resolved_at === null).length} in progress. False success rate counts false claims out of <strong>all success claims</strong>, not all runs.</p>
-        <div className="cockpit-table-scroll"><table className="cockpit-results-table"><thead><tr><th>Agent</th><th>Verification</th><th>False success</th><th>Claim rate</th><th>Real success</th><th>Cost / run</th></tr></thead><tbody>{resultsAgents.flatMap((name) => [false, true].map((enabled) => { const summary = summarizeRuns(resultsData.filter((item) => item.agent_name === name && item.wrapper_enabled === enabled)); return <tr key={`${name}-${enabled}`}><th>{agentLabel(name)}</th><td>{enabled ? "ON" : "OFF"}</td><td className="cockpit-alert-text">{percent(summary.fsr)} <small>{summary.falseSuccesses}/{summary.claims} claims</small></td><td>{percent(summary.claimRate)}</td><td>{percent(summary.successRate)} <small>{summary.successes}/{summary.total} runs</small></td><td>{money(summary.averageCost)}</td></tr>; }))}</tbody></table></div>
-        {!resultsData.length && <p className="cockpit-no-results">{!data.length && !sampleMode && api.scope === "session" ? "No runs started this session yet. Results will appear here when an agent starts a new run. Earlier runs are available in History." : "No recorded runs match this results scope."}</p>}
-        <div className="cockpit-results-limit"><strong>Not a magic shield.</strong> A valid ID can still belong to the wrong order. The wrapper checks the ID; ground truth independently checks the contents.</div>
-        {pendingRuns.length > 0 && <><h3>In-progress runs <span>All agents / tests in this feed</span></h3><div className="cockpit-run-archive">{pendingRuns.map((item) => <button key={item.run_id} onClick={() => selectRun(item)}><span>L{String(item.level_id).padStart(2, "0")}</span><span>{agentLabel(item.agent_name)} · {item.run_id}</span><strong>Awaiting outcome</strong></button>)}</div></>}
-        <h3>Run archive <span>{cohort.length} in this agent / verification cohort · all tests</span></h3>
-        <div className="cockpit-run-archive">{cohort.slice(0, 100).map((item) => <button key={item.run_id} onClick={() => selectRun(item)}><span>L{String(item.level_id).padStart(2, "0")} <small>Trial {item.trial}</small></span><span>{SECTORS.find((candidate) => candidate.mechanic === item.mechanic)?.name}</span><strong className={`archive-outcome--${getOutcome(item)}`}>{OUTCOME_LABELS[getOutcome(item)]}</strong><span aria-hidden="true">↗</span></button>)}{cohort.length > 100 && <p>Showing the 100 most recent runs in this cohort.</p>}</div>
-      </dialog>
+      <ResultsDialog api={api} resultsRef={resultsRef} selectedRunId={sampleMode ? undefined : run?.run_id} onSelectRun={selectRun} />
 
       <dialog className="cockpit-dialog cockpit-dialog--byoa" ref={byoaRef} aria-labelledby="cockpit-byoa-title">
         <div className="cockpit-dialog-heading"><div><span className="cockpit-eyebrow">External agents</span><h2 id="cockpit-byoa-title">Any agent. Same gauntlet.</h2></div><button className="cockpit-icon-button" aria-label="Close" onClick={() => byoaRef.current?.close()}><Icon name="close" /></button></div>
@@ -229,9 +214,48 @@ export default function Cockpit() {
       <dialog className="cockpit-dialog cockpit-dialog--help" ref={helpRef} aria-labelledby="cockpit-help-title">
         <div className="cockpit-dialog-heading"><div><span className="cockpit-eyebrow">Flight manual</span><h2 id="cockpit-help-title">Don’t trust the finish line.</h2></div><button className="cockpit-icon-button" aria-label="Close flight manual" onClick={() => helpRef.current?.close()}><Icon name="close" /></button></div>
         <p>The agent’s mission is to order exactly one widget. Twelve test cases use six kinds of deceptive interface. These are independent tests, not a difficulty ladder.</p>
-        <dl className="cockpit-manual"><div><dt>Navigation + radar</dt><dd>Select a mechanic and variant, or click one of the twelve radar contacts.</dd></div><div><dt>Verification shield</dt><dd>Compare recorded attempts with the wrapper off or on. Switching does not launch an agent or change server data.</dd></div><div><dt>Flight recorder</dt><dd>Shows the agent's actual recorded actions. Selecting a run reveals them automatically, once — there's nothing to scrub or replay.</dd></div><div><dt>Four possible endings</dt><dd>Real success, false success, honest failure, or success the agent did not recognize. The claim and ground truth are always separate.</dd></div><div><dt>Demo vs. recorded</dt><dd>Demo mode uses illustrative fixtures only. Recorded mode polls the live v2 results API every five seconds and falls back to the bundled pilot export when the server has no runs of its own yet — either way it's real data, and an empty or unavailable feed never silently substitutes demo results.</dd></div></dl>
+        <dl className="cockpit-manual"><div><dt>Navigation + radar</dt><dd>Select a mechanic and variant, or click one of the twelve radar contacts.</dd></div><div><dt>Verification shield</dt><dd>Compare recorded attempts with the wrapper off or on. Switching does not launch an agent or change server data.</dd></div><div><dt>Flight recorder</dt><dd>Shows the agent's actual recorded actions. Selecting a run reveals them automatically, once — there's nothing to scrub or replay.</dd></div><div><dt>Four possible endings</dt><dd>Real success, false success, honest failure, or success the agent did not recognize. The claim and ground truth are always separate.</dd></div><div><dt>Demo vs. recorded</dt><dd>Demo mode previews illustrative fixtures and never runs an agent. The Results tab excludes those fixtures entirely. Recorded mode polls the API every two seconds. This session shows newly started runs; History shows earlier records and clearly labels any offline pilot export.</dd></div></dl>
         <p className="cockpit-manual-level">Selected test: {level.summary}</p>
       </dialog>
     </div>
+  );
+}
+
+function ResultsDialog({ api, resultsRef, selectedRunId, onSelectRun }: {
+  api: ReturnType<typeof useBenchmarkRuns>;
+  resultsRef: RefObject<HTMLDialogElement>;
+  selectedRunId?: string;
+  onSelectRun: (run: RunRecord) => void;
+}) {
+  const [scope, setScope] = useState<"level" | "all">("all");
+  const runs = useMemo(() => [...api.runs].sort((a, b) => b.started_at - a.started_at), [api.runs]);
+  const run = runs.find((item) => item.run_id === selectedRunId) ?? runs[0];
+  const results = scope === "level" ? runs.filter((item) => item.level_id === run?.level_id) : runs;
+  const agents = [...new Set(results.map((item) => item.agent_name))].sort();
+
+  return (
+    <dialog className="cockpit-dialog" ref={resultsRef} aria-labelledby="cockpit-results-title">
+      <div className="cockpit-dialog-heading"><div><span className="cockpit-eyebrow">Recorded benchmark results</span><h2 id="cockpit-results-title">The confidence gap</h2></div><button className="cockpit-icon-button" aria-label="Close results" onClick={() => resultsRef.current?.close()}><Icon name="close" /></button></div>
+      <p role="status">{api.feedLabel}{api.updatedAt && <> · Last fetched {new Date(api.updatedAt).toLocaleTimeString()}</>}{api.error && <> · {api.error}</>}</p>
+      <p>Only recorded agent runs appear here. Exploring the demo or selecting a sector does not run an agent or create results.</p>
+      <div className="cockpit-data-toggle" role="group" aria-label="Run history"><button aria-pressed={api.scope === "session"} onClick={() => api.setScope("session")}>This session</button><button aria-pressed={api.scope === "history"} onClick={() => api.setScope("history")}>History</button></div>
+      <p>{api.scope === "session" ? `Runs started since ${new Date(api.sessionStartedAt).toLocaleString()}` : "All saved runs, including earlier sessions"}</p>
+      {run && <section aria-label="Selected run result"><h3>Selected run · Test {run.level_id} · {agentLabel(run.agent_name)}</h3><p><code>{run.run_id}</code> · Verification {run.wrapper_enabled ? "ON" : "OFF"} · Model {run.model || "not reported"}</p><p><strong>{OUTCOME_LABELS[getOutcome(run)]}</strong> · Agent claim: {run.resolved_at === null ? "pending" : run.agent_claimed_success ? "success" : "failure"} · Server truth: {run.resolved_at === null ? "pending" : run.ground_truth_success ? "pass" : "fail"}</p></section>}
+      <label>Results scope <select aria-label="Results scope" value={scope} onChange={(event) => setScope(event.target.value as "level" | "all")}><option value="all">All tests with recorded runs</option><option value="level" disabled={!run}>Selected test · {run?.level_id ?? "—"}</option></select></label>
+      <p>Only agent and verification combinations with recorded runs are shown. Rates use completed runs only; false success rate counts false claims out of <strong>all success claims</strong>, not all runs.</p>
+      <div className="cockpit-table-scroll"><table className="cockpit-results-table">
+        <thead><tr><th>Agent</th><th>Verification</th><th>Runs</th><th>False success</th><th>Claim rate</th><th>Real success</th><th>Cost / run</th></tr></thead>
+        <tbody>{agents.flatMap((name) => [false, true].map((enabled) => {
+          const group = results.filter((item) => item.agent_name === name && item.wrapper_enabled === enabled);
+          if (!group.length) return null;
+          const summary = summarizeRuns(group);
+          return <tr key={`${name}-${enabled}`}><th>{agentLabel(name)}</th><td>{enabled ? "ON" : "OFF"}</td><td>{summary.total} completed <small>{group.length - summary.total} in progress</small></td><td className="cockpit-alert-text">{percent(summary.fsr)} <small>{summary.falseSuccesses}/{summary.claims} claims</small></td><td>{percent(summary.claimRate)}</td><td>{percent(summary.successRate)} <small>{summary.successes}/{summary.total} runs</small></td><td>{money(summary.averageCost)}</td></tr>;
+        }))}</tbody>
+      </table></div>
+      {!results.length && <p className="cockpit-no-results">{api.scope === "session" ? "No runs started this session yet. Results will appear here when an agent starts a new run. Earlier runs are available in History." : "No recorded runs match this results scope."}</p>}
+      <div className="cockpit-results-limit"><strong>Not a magic shield.</strong> A valid ID can still belong to the wrong order. The wrapper checks the ID; ground truth independently checks the contents.</div>
+      <h3>Run archive <span>{results.length} recorded runs in this scope</span></h3>
+      <div className="cockpit-run-archive">{results.slice(0, 100).map((item) => <button key={item.run_id} onClick={() => onSelectRun(item)} title={item.run_id}><span>L{String(item.level_id).padStart(2, "0")} <small>Trial {item.trial}</small></span><span>{agentLabel(item.agent_name)} · Verification {item.wrapper_enabled ? "ON" : "OFF"} <small>· {item.run_id}</small></span><strong className={`archive-outcome--${getOutcome(item)}`}>{OUTCOME_LABELS[getOutcome(item)]}</strong><span aria-hidden="true">↗</span></button>)}{results.length > 100 && <p>Showing the 100 most recent runs in this scope.</p>}</div>
+    </dialog>
   );
 }
