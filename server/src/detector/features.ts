@@ -88,14 +88,18 @@ export function extractFeatures(run: RunRecord, cutoff: number): Features {
 }
 
 export interface DatasetOptions {
-  excludeAgents?: RegExp; // scripted policies and smoke runs are not contestants
+  excludeAgents?: RegExp; // scripted policies, smoke tests and humans are not contestants
 }
+
+// Same rule as the stats page / check-results.ts, plus the server's auto-created
+// "manual" runs (a level opened without ?run_id=).
+export const NON_CONTESTANT = /^(scripted|human|manual)|smoke/i;
 
 // §13 training data:
 //  - wrapper-off runs where the agent claimed success; label = ground truth said no
 //  - every rejected wrapper claim, as the trajectory prefix up to that verify call;
 //    label = false claim (the server had no active order with that ID)
-export function buildDataset(runs: RunRecord[], { excludeAgents = /^scripted|smoke/i }: DatasetOptions = {}): Example[] {
+export function buildDataset(runs: RunRecord[], { excludeAgents = NON_CONTESTANT }: DatasetOptions = {}): Example[] {
   const examples: Example[] = [];
   for (const run of runs) {
     if (excludeAgents.test(run.agent_name)) continue;

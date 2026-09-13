@@ -140,8 +140,10 @@ describe("buildDataset", () => {
     assert.equal(rejectedClaimCutoff(run({ trajectory: trajectory.slice(0, 1) }), 3000), 3000); // no done nearby
   });
 
-  test("scripted policies and smoke runs are excluded", () => {
-    assert.equal(buildDataset([run({ agent_name: "scripted-careful" }), run({ agent_name: "smoke-test-agent" })]).length, 0);
+  test("scripted policies, smoke runs, humans and manual runs are excluded", () => {
+    const names = ["scripted-careful", "smoke-test-agent", "steel-smoke", "human-outside", "manual"];
+    assert.equal(buildDataset(names.map((agent_name) => run({ agent_name }))).length, 0);
+    assert.equal(buildDataset([run({ agent_name: "browser-use" })]).length, 1);
   });
 });
 
