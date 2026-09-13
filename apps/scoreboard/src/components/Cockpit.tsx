@@ -25,6 +25,15 @@ export default function Cockpit() {
   const api = useBenchmarkRuns();
   const reducedMotion = useReducedMotion();
   const [source, setSource] = useState<"demo" | "recorded">("demo");
+  // Real data (live server or the bundled pilot export) beats illustrative
+  // fixtures the moment it shows up — but only takes over once, so a viewer who
+  // deliberately switches back to Demo isn't fought on the next 5s poll.
+  const autoSelectedRef = useRef(false);
+  useEffect(() => {
+    if (autoSelectedRef.current || api.origin === "none") return;
+    autoSelectedRef.current = true;
+    setSource("recorded");
+  }, [api.origin]);
   const [agent, setAgent] = useState("browser-use");
   const [levelId, setLevelId] = useState(4);
   const [wrapper, setWrapper] = useState(false);
@@ -98,7 +107,7 @@ export default function Cockpit() {
       <header className="cockpit-header">
         <div className="cockpit-brand"><span className="cockpit-brand-mark" aria-hidden="true">G</span><div><h1>Gauntlet</h1><span>Autonomous agent flight deck</span></div></div>
         <div className="cockpit-header-center">
-          <span className={`cockpit-source-label${sampleMode ? " cockpit-source-label--demo" : ""}`}><i />{sampleMode ? "DEMO REPLAY · ILLUSTRATIVE DATA" : "RECORDED BENCHMARK DATA"}</span>
+          <span className={`cockpit-source-label${sampleMode ? " cockpit-source-label--demo" : ""}`}><i />{sampleMode ? "DEMO REPLAY · ILLUSTRATIVE DATA" : api.origin === "live" ? "LIVE BENCHMARK DATA" : "RECORDED BENCHMARK DATA · PILOT EXPORT"}</span>
           <span className="cockpit-header-motto">A confident agent is not a successful agent.</span>
         </div>
         <nav className="cockpit-header-actions" aria-label="Cockpit tools">
@@ -161,7 +170,7 @@ export default function Cockpit() {
       </section>
 
       <footer className="cockpit-controls">
-        <div className="cockpit-data-controls"><div className="cockpit-data-toggle" role="group" aria-label="Data source"><button aria-pressed={sampleMode} onClick={() => { setSource("demo"); setRunChoice(""); }}>Demo</button><button aria-pressed={!sampleMode} onClick={() => { setSource("recorded"); setRunChoice(""); }}>Recorded</button></div><button className={`cockpit-api-state cockpit-api-state--${api.status}`} onClick={api.refresh} title={api.error || "Refresh results from the v2 API"}><i />{api.status === "connected" ? `API connected · ${api.runs.length} runs` : api.status === "connecting" ? "Connecting to API" : "API offline · retry"}</button></div>
+        <div className="cockpit-data-controls"><div className="cockpit-data-toggle" role="group" aria-label="Data source"><button aria-pressed={sampleMode} onClick={() => { setSource("demo"); setRunChoice(""); }}>Demo</button><button aria-pressed={!sampleMode} onClick={() => { setSource("recorded"); setRunChoice(""); }}>Recorded</button></div><button className={`cockpit-api-state cockpit-api-state--${api.status}`} onClick={api.refresh} title={api.error || "Refresh results from the v2 API"}><i />{api.status === "connected" ? `${api.origin === "live" ? "Live" : "Pilot export"} · ${api.runs.length} runs` : api.status === "connecting" ? "Connecting to API" : "API offline · retry"}</button></div>
         <div className="cockpit-playback"><button className="cockpit-icon-button" aria-label="Restart replay" disabled={!run} onClick={replay.restart}><Icon name="restart" /></button><button className="cockpit-play-button" aria-label={replay.playing ? "Pause replay" : "Play replay"} disabled={!run || reducedMotion || run.resolved_at === null} onClick={replay.toggle}><Icon name={replay.playing ? "pause" : "play"} /></button><time>{formatTime(replay.time)}</time><input type="range" aria-label="Replay position" min="0" max={replay.duration || 1} step="0.1" value={replay.time} disabled={!run} onChange={(event) => replay.seek(Number(event.target.value))} style={{ "--seek-progress": `${replay.progress * 100}%` } as CSSProperties} /><time className="cockpit-total-time">{formatTime(replay.duration)}</time><button className="cockpit-speed" aria-label={`Playback speed ${replay.speed}x`} onClick={() => replay.setSpeed(replay.speed === 4 ? 1 : replay.speed * 2)}>{replay.speed}×</button></div>
         <span className="cockpit-footer-note">{sampleMode ? "ILLUSTRATIVE REPLAY · NO AGENT RUNNING" : "READ-ONLY REPLAY · NO AGENTS LAUNCHED"}</span>
       </footer>
@@ -179,7 +188,7 @@ export default function Cockpit() {
       <dialog className="cockpit-dialog cockpit-dialog--help" ref={helpRef} aria-labelledby="cockpit-help-title">
         <div className="cockpit-dialog-heading"><div><span className="cockpit-eyebrow">Flight manual</span><h2 id="cockpit-help-title">Don’t trust the finish line.</h2></div><button className="cockpit-icon-button" aria-label="Close flight manual" onClick={() => helpRef.current?.close()}><Icon name="close" /></button></div>
         <p>The agent’s mission is to order exactly one widget. Twelve test cases use six kinds of deceptive interface. These are independent tests, not a difficulty ladder.</p>
-        <dl className="cockpit-manual"><div><dt>Navigation + radar</dt><dd>Select a mechanic and variant, or click one of the twelve radar contacts.</dd></div><div><dt>Verification shield</dt><dd>Compare recorded attempts with the wrapper off or on. Switching does not launch an agent or change server data.</dd></div><div><dt>Flight recorder</dt><dd>Play, pause, change speed, or scrub the recorded trajectory. Space toggles playback when a form control isn’t focused.</dd></div><div><dt>Four possible endings</dt><dd>Real success, false success, honest failure, or success the agent did not recognize. The claim and ground truth are always separate.</dd></div><div><dt>Demo vs. recorded</dt><dd>Demo mode uses illustrative fixtures only. Recorded mode reads the real v2 results API every five seconds; an empty or unavailable feed never substitutes demo results.</dd></div></dl>
+        <dl className="cockpit-manual"><div><dt>Navigation + radar</dt><dd>Select a mechanic and variant, or click one of the twelve radar contacts.</dd></div><div><dt>Verification shield</dt><dd>Compare recorded attempts with the wrapper off or on. Switching does not launch an agent or change server data.</dd></div><div><dt>Flight recorder</dt><dd>Play, pause, change speed, or scrub the recorded trajectory. Space toggles playback when a form control isn’t focused.</dd></div><div><dt>Four possible endings</dt><dd>Real success, false success, honest failure, or success the agent did not recognize. The claim and ground truth are always separate.</dd></div><div><dt>Demo vs. recorded</dt><dd>Demo mode uses illustrative fixtures only. Recorded mode polls the live v2 results API every five seconds and falls back to the bundled pilot export when the server has no runs of its own yet — either way it's real data, and an empty or unavailable feed never silently substitutes demo results.</dd></div></dl>
         <p className="cockpit-manual-level">Selected test: {level.summary}</p>
       </dialog>
     </div>

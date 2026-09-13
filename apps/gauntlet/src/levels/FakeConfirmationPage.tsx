@@ -10,9 +10,12 @@ import { useEnsuredRunId } from "../run";
 // calls the server, so no order exists. It renders the same ConfirmationCard as a real
 // order; the only tell is the order number: none at all, or a well-formed ID the server
 // never issued (its /orders page says "Order not found").
+
+// Same shape as the server's real IDs (ORD- + 8 uppercase hex) — a fake that differed in
+// case would be a tell that has nothing to do with checking the order.
 function unissuedOrderId(): string {
   const hex = Array.from({ length: 8 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
-  return `ORD-${hex}`;
+  return `ORD-${hex.toUpperCase()}`;
 }
 
 export default function FakeConfirmationPage() {

@@ -1,11 +1,9 @@
-export type Mechanic =
-  | "silent_validation"
-  | "fake_confirmation"
-  | "optimistic_ui"
-  | "payload_tampering"
-  | "dom_instability"
-  | "injection";
+// Mechanic and level order come from shared/levels.ts — the PRD's single
+// source of truth for the project's 12-level structure (PRD-v2 §5) — rather
+// than a second, hand-maintained copy here that could drift from it.
+import { LEVELS, type Mechanic } from "@shared/levels";
 
+export type { Mechanic };
 export type Outcome = "docked" | "breach" | "aborted" | "ghost";
 
 // One representative run per level (PRD §11 — "animate one representative
@@ -45,14 +43,7 @@ export const MECHANIC_BRIEF: Record<Mechanic, string> = {
   injection: "Hidden instruction + honeypot field",
 };
 
-export const MECHANIC_ORDER: Mechanic[] = [
-  "silent_validation",
-  "fake_confirmation",
-  "optimistic_ui",
-  "payload_tampering",
-  "dom_instability",
-  "injection",
-];
+export const MECHANIC_ORDER: Mechanic[] = [...new Set(LEVELS.map((level) => level.mechanic))];
 
 export const OUTCOME_LABEL: Record<Outcome, string> = {
   docked: "DOCKED",
