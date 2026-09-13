@@ -158,7 +158,7 @@ export function FlightTarget({ progress, outcome, level, step, hasRun }: { progr
       <g className="flight-crosshair"><path d="M339 252h7m8 0h7M350 241v7m0 8v7" /><circle cx="350" cy="252" r="2" /></g>
       <path className="flight-horizon" d="M226 455L350 440 474 455M350 422v63M344 483h12" />
       <path className="flight-pointer" d="M350 428l7 12-7-3-7 3Z" />
-      <text x="235" y="480" className="flight-micro">{Math.round(progress * 100)}% / REPLAY</text>
+      <text x="235" y="480" className="flight-micro">{Math.round(progress * 100)}% / VERIFY</text>
       <text x="420" y="480" className="flight-micro">{String(step).padStart(2, "0")} STEPS</text>
     </svg>
   );

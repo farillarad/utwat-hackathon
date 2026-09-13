@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { RunRecord } from "@shared/schema/benchmarkRun";
 import { getRunDuration, isBenchmarkRun } from "./benchmark";
 
@@ -79,48 +79,40 @@ export function useBenchmarkRuns() {
   return { runs, origin, status, error, refresh: useCallback(() => setRevision((value) => value + 1), []) };
 }
 
-export function useFlightReplay(run: RunRecord | undefined, reducedMotion: boolean) {
+// One brief, automatic build-up to the claim-vs-truth verdict — no scrubbing,
+// no speed control, nothing that reads as "video playback" of pre-recorded
+// footage (this is a benchmark of live agent behavior, not a movie). A live
+// run in progress (resolved_at === null) has nothing to build up to, so it
+// just shows everything recorded so far, updating as the 5s poll brings in
+// more; reduced motion skips the build-up the same way.
+const REVEAL_MS = 4200;
+
+export function useReveal(run: RunRecord | undefined, reducedMotion: boolean) {
   const duration = getRunDuration(run);
-  const [time, setTime] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(2);
-  const currentRef = useRef(time);
-  currentRef.current = time;
+  const live = !!run && run.resolved_at === null;
+  const [progress, setProgress] = useState(1);
 
   useEffect(() => {
-    setTime(reducedMotion ? duration : duration * 0.45);
-    setPlaying(!!run && run.resolved_at !== null && !reducedMotion);
-  }, [run?.run_id, run?.resolved_at, duration, reducedMotion]);
-
-  useEffect(() => {
-    if (!playing || !duration || reducedMotion) return;
+    if (!run || live || reducedMotion) {
+      setProgress(1);
+      return;
+    }
+    setProgress(0);
     let frame = 0;
-    let previous = performance.now();
+    const start = performance.now();
     const tick = (now: number) => {
-      const next = Math.min(duration, currentRef.current + Math.min((now - previous) / 1000, 0.15) * speed);
-      previous = now;
-      currentRef.current = next;
-      setTime(next);
-      if (next >= duration) setPlaying(false);
-      else frame = requestAnimationFrame(tick);
+      const next = Math.min(1, (now - start) / REVEAL_MS);
+      setProgress(next);
+      if (next < 1) frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [playing, duration, speed, reducedMotion]);
+  }, [run?.run_id, run?.resolved_at, reducedMotion, live]);
 
-  const seek = (value: number) => {
-    setTime(Math.max(0, Math.min(duration, value)));
-    setPlaying(false);
+  return {
+    time: live ? Number.POSITIVE_INFINITY : progress * duration,
+    duration,
+    progress,
+    playing: live || progress < 1,
   };
-  const toggle = () => {
-    if (!duration || reducedMotion) return;
-    if (time >= duration) setTime(0);
-    setPlaying((value) => !value);
-  };
-  const restart = () => {
-    setTime(0);
-    setPlaying(!!duration && !reducedMotion);
-  };
-
-  return { time, duration, playing: playing && !reducedMotion, speed, setSpeed, seek, toggle, restart, progress: duration ? Math.min(1, time / duration) : 0 };
 }
