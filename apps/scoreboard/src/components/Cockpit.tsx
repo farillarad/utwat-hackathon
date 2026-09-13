@@ -31,14 +31,22 @@ export default function Cockpit() {
     if (autoSelectedRef.current === api.scope || !api.runs.length) return;
     autoSelectedRef.current = api.scope;
     setSource("recorded");
+    setRunChoice("");
+    // Browsing recorded history always starts at the beginning: Sector 01 / Test 01.
+    if (api.scope === "history") {
+      setAgent(api.runs.some((r) => r.agent_name === "browser-use") ? "browser-use" : api.runs[0].agent_name);
+      setWrapper(false);
+      setLevelId(1);
+      return;
+    }
+    // A run launched this session: jump straight to it (in-progress first, then newest).
     const latest = [...api.runs].sort((a, b) => Number(a.resolved_at !== null) - Number(b.resolved_at !== null) || b.started_at - a.started_at)[0];
     setAgent(latest.agent_name);
     setWrapper(latest.wrapper_enabled);
     setLevelId(latest.level_id);
-    setRunChoice("");
   }, [api.runs, api.scope]);
   const [agent, setAgent] = useState("browser-use");
-  const [levelId, setLevelId] = useState(4);
+  const [levelId, setLevelId] = useState(1); // opens on Sector 01 / Test 01
   const [wrapper, setWrapper] = useState(false);
   const [runChoice, setRunChoice] = useState("");
   const [toast, setToast] = useState("");
@@ -75,8 +83,7 @@ export default function Cockpit() {
   // agent/test/shield selection is the reason nothing's showing — so it
   // doesn't just flip the data source and hope the existing selection
   // happens to line up, it jumps to a specific combo guaranteed to be in
-  // DEMO_RUNS: level 5 (optimistic UI) is the PRD's own demo beat (§18) —
-  // both agents fall for it wrapper-off, a legible, dramatic false success.
+  // DEMO_RUNS: the start of the course, Sector 01 / Test 01, browser-use, shield off.
   // Changing levelId/agent/wrapper puts a genuinely new run in front of
   // useReveal, whose own effect (keyed on run.run_id) then starts the
   // build-up automatically — no separate "start" call needed here.
@@ -84,7 +91,7 @@ export default function Cockpit() {
     autoSelectedRef.current = api.scope;
     setSource("demo");
     setAgent("browser-use");
-    setLevelId(5);
+    setLevelId(1);
     setWrapper(false);
     setRunChoice("");
   };
