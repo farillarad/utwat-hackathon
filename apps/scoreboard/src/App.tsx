@@ -2,6 +2,7 @@ import { useRef } from "react";
 import ComparisonBoard from "./components/ComparisonBoard";
 import { useRunStream } from "./ws/useRunStream";
 import { useNow } from "./lib/useNow";
+import Cockpit from "./components/Cockpit";
 
 const MAX_ROWS = 4;
 
@@ -13,6 +14,10 @@ function formatDuration(ms: number): string {
 }
 
 export default function App() {
+  return new URLSearchParams(window.location.search).get("view") === "legacy" ? <LegacyBoard /> : <Cockpit />;
+}
+
+function LegacyBoard() {
   const { runs, connection, dismiss, clearAll } = useRunStream();
   // Newest runs win the screen; older ones are still in memory and reappear when a row is dismissed.
   const visible = runs.slice(-MAX_ROWS);
