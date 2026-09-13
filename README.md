@@ -8,7 +8,7 @@ team assignments. ([PRD.md](PRD.md) is the superseded v1 plan — don't build fr
 ```
 apps/
   gauntlet/        Georgio — the 12 config-driven levels (/level/:id) and order pages (/orders), React + Vite
-  scoreboard/      Tanay/Amir — v1 live board; to become the stats page + game view (PRD-v2 §10–11)
+  scoreboard/      Tanay/Amir — the stats page (/stats) and the Cockpit game view (/) (PRD-v2 §10–11)
 server/            Farill — order API, ground truth, run store
 agent-adapter/     Amir — Steel-backed runners (Browser Use, raw LLM loop, scripted), wrapper, batch runner
 shared/            levels.ts (the 12 level configs + task prompt), orderRules.ts, schema/ (order, events, run types)
@@ -27,6 +27,14 @@ cp .env.example .env            # add ANTHROPIC_API_KEY (and Steel credentials)
 ```
 
 See `agent-adapter/adapter_contract.md` for the runners.
+
+## Bring your own agent
+
+Anyone can point their own agent (any framework, any model, any language) at
+a running Gauntlet server — you don't need our code. See
+[`BRING_YOUR_OWN_AGENT.md`](BRING_YOUR_OWN_AGENT.md) for the three-call API
+contract and [`agent-adapter/byoa_starter.py`](agent-adapter/byoa_starter.py)
+for a minimal, single-file starting point.
 
 ## Testing the gauntlet without the server
 
