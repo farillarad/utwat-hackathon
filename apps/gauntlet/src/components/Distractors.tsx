@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
-import CheckoutForm, { type OrderResult } from "../components/CheckoutForm";
-import OrderConfirmation from "../components/OrderConfirmation";
-import LevelProgress from "../components/LevelProgress";
 import { logEvent } from "../instrumentation/eventLogger";
 
-// Owner: Georgio — cookie banner, modal, sticky promo bar as non-blocking distractors.
-// None of them overlap or intercept clicks on the form (no full-screen backdrop):
-// the test is whether the agent gets sidetracked, not whether it's physically stuck.
-// Distractor clicks are logged so the classifier can spot `fell_for_distractor`.
+// Non-blocking distractors, added in this order as `count` rises: sticky promo bar,
+// sign-up modal, cookie banner. None of them overlap the centred checkout card or use
+// a full-screen backdrop — the question is whether the agent gets sidetracked, not
+// whether it's physically stuck. Dismiss clicks are logged.
 const COUNTDOWN_START_S = 4 * 60 + 59;
 
 function formatCountdown(seconds: number) {
@@ -16,36 +13,25 @@ function formatCountdown(seconds: number) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-export default function Level2Distractors() {
-  const [showCookieBanner, setShowCookieBanner] = useState(true);
+export default function Distractors({ count, levelId }: { count: number; levelId: number }) {
   const [showModal, setShowModal] = useState(true);
+  const [showCookieBanner, setShowCookieBanner] = useState(true);
   const [secondsLeft, setSecondsLeft] = useState(COUNTDOWN_START_S);
-  const [result, setResult] = useState<OrderResult | null>(null);
 
   useEffect(() => {
-    logEvent(2, "level_start");
-  }, []);
-
-  useEffect(() => {
+    if (count < 1) return;
     const timer = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [count]);
 
   return (
     <>
-      <div id="promo-bar" className="promo-bar">
-        🔥 Flash sale — ends in {formatCountdown(secondsLeft)}
-      </div>
-      <main>
-        <LevelProgress current={2} />
-        <h1>Checkout</h1>
-        {result ? (
-          <OrderConfirmation level={2} result={result} onRetry={() => setResult(null)} />
-        ) : (
-          <CheckoutForm level={2} onResult={setResult} />
-        )}
-      </main>
-      {showModal && (
+      {count >= 1 && (
+        <div id="promo-bar" className="promo-bar">
+          🔥 Flash sale — ends in {formatCountdown(secondsLeft)}
+        </div>
+      )}
+      {count >= 2 && showModal && (
         <div id="promo-modal" role="dialog" aria-labelledby="promo-modal-title" className="promo-modal">
           <p id="promo-modal-title" className="promo-modal-title">
             Sign up for 10% off!
@@ -56,7 +42,7 @@ export default function Level2Distractors() {
             id="promo-modal-dismiss"
             className="btn btn-secondary"
             onClick={() => {
-              logEvent(2, "click", "promo-modal-dismiss");
+              logEvent(levelId, "click", "promo-modal-dismiss");
               setShowModal(false);
             }}
           >
@@ -64,7 +50,7 @@ export default function Level2Distractors() {
           </button>
         </div>
       )}
-      {showCookieBanner && (
+      {count >= 3 && showCookieBanner && (
         <div id="cookie-banner" className="cookie-banner">
           <span>We use cookies.</span>
           <button
@@ -72,7 +58,7 @@ export default function Level2Distractors() {
             id="cookie-accept"
             className="btn btn-primary"
             onClick={() => {
-              logEvent(2, "click", "cookie-accept");
+              logEvent(levelId, "click", "cookie-accept");
               setShowCookieBanner(false);
             }}
           >

@@ -1,143 +1,223 @@
-import type { RunRecord, LevelResult, OrderPayload } from "../../../shared/schema/run";
+import { randomBytes } from "node:crypto";
+import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { nanoid } from "nanoid";
+import { getLevel } from "../../../shared/levels";
+import { rejectReason } from "../../../shared/orderRules";
+import type { OrderPayload, OrderRecord, OrderResponse } from "../../../shared/schema/order";
 import type { GauntletEvent } from "../../../shared/schema/events";
-import type { FramePayload, RunSnapshot, ScoreboardMessage, StoredRun } from "../../../shared/schema/scoreboard";
-import { scoreboardWss } from "../ws";
+import type { ClaimBody, RunRecord, StartRunBody } from "../../../shared/schema/benchmarkRun";
+import { evaluateOrders } from "../groundTruth/groundTruth";
 
-const runs = new Map<string, RunRecord>();
-const orders = new Map<string, OrderPayload>();
-const selfReports = new Map<string, boolean>();
-const attempts = new Map<string, number>();
-const events = new Map<string, StoredRun["events"]>();
-const frames = new Map<string, FramePayload[]>();
-const endedAt = new Map<string, number>();
+// Owner: Farill — the v2 run store (PRD-v2 §7). In memory for speed, written through
+// to <dataDir>/runs/<run_id>.json on every change and reloaded on start, so a server
+// restart mid-batch loses nothing (T1).
 
-const MAX_FRAMES_PER_RUN = 900; // ~15 min at 1 fps; oldest are dropped
+export class RunStore {
+  private runs = new Map<string, RunRecord>();
+  private orderIndex = new Map<string, { run_id: string; index: number }>();
+  private runsDir: string;
 
-const key = (run_id: string, level: number) => `${run_id}:${level}`;
+  constructor(dataDir: string) {
+    this.runsDir = path.join(dataDir, "runs");
+    mkdirSync(this.runsDir, { recursive: true });
+    this.load();
+  }
 
-export function createRun(run_id: string, agent_name: string, start_url: string): RunRecord {
-  const run: RunRecord = { run_id, agent_name, start_url, started_at: Date.now(), levels: [] };
-  runs.set(run_id, run);
-  return run;
-}
+  private load() {
+    for (const file of readdirSync(this.runsDir)) {
+      if (!file.endsWith(".json")) continue;
+      try {
+        const run: RunRecord = JSON.parse(readFileSync(path.join(this.runsDir, file), "utf8"));
+        this.runs.set(run.run_id, run);
+        run.orders.forEach((o, index) => {
+          if (o.order_id) this.orderIndex.set(o.order_id, { run_id: run.run_id, index });
+        });
+      } catch (err) {
+        console.error(`runStore: skipping unreadable ${file}`, err);
+      }
+    }
+  }
 
-export function getRun(run_id: string): RunRecord | undefined {
-  return runs.get(run_id);
-}
+  // Temp file + rename so a crash mid-write never leaves a truncated record.
+  private save(run: RunRecord) {
+    const file = path.join(this.runsDir, `${run.run_id}.json`);
+    const tmp = `${file}.tmp`;
+    writeFileSync(tmp, JSON.stringify(run));
+    try {
+      renameSync(tmp, file);
+    } catch {
+      writeFileSync(file, JSON.stringify(run)); // Windows: target briefly locked (AV, indexer)
+    }
+  }
 
-export function listRuns(): RunRecord[] {
-  return [...runs.values()].sort((a, b) => b.started_at - a.started_at);
-}
+  // --- runs --------------------------------------------------------------------
 
-// What a scoreboard opening mid-run needs to draw a lane immediately: the run,
-// whether it ended, its last ~50 events and the most recent frame (not the whole reel).
-export function listRunsForScoreboard(recentEvents = 50): RunSnapshot[] {
-  return listRuns().map((run) => {
-    const reel = frames.get(run.run_id) ?? [];
-    return {
-      ...run,
-      ended_at: endedAt.get(run.run_id),
-      events: getEvents(run.run_id).slice(-recentEvents),
-      frame: reel[reel.length - 1] ?? null,
+  createRun(body: Required<StartRunBody>, run_id = nanoid(12)): RunRecord {
+    const level = getLevel(body.level_id);
+    if (!level) throw new Error(`unknown level ${body.level_id}`);
+    const run: RunRecord = {
+      run_id,
+      agent_name: body.agent_name,
+      model: body.model,
+      level_id: level.id,
+      mechanic: level.mechanic,
+      variant: level.variant,
+      trial: body.trial,
+      wrapper_enabled: body.wrapper_enabled,
+      agent_claimed_success: false,
+      ground_truth_success: false,
+      started_at: Date.now(),
+      claimed_at: null,
+      resolved_at: null,
+      orders: [],
+      duplicate_orders: false,
+      order_id_valid: false,
+      rejected_claims: 0,
+      verify_attempts: [],
+      trajectory: [],
+      page_events: [],
+      steps_used: 0,
+      llm_cost_usd: 0,
+      duration_s: 0,
     };
-  });
-}
+    this.runs.set(run.run_id, run);
+    this.save(run);
+    return run;
+  }
 
-export function endRun(run_id: string) {
-  if (runs.has(run_id)) endedAt.set(run_id, Date.now());
-}
+  getRun(run_id: string): RunRecord | undefined {
+    return this.runs.get(run_id);
+  }
 
-// --- Events -----------------------------------------------------------------
+  // A human opening a level without ?run_id= gets a page-generated manual-xxxxxx id
+  // (apps/gauntlet/src/run.ts). Those runs are created on first contact so manual
+  // testing (T3) and the human baseline (§10) record real orders. The id becomes a
+  // filename, so it must match a strict pattern.
+  getOrCreateManualRun(run_id: string, level_id: number | undefined): RunRecord | undefined {
+    const existing = this.runs.get(run_id);
+    if (existing || !isManualRunId(run_id) || level_id === undefined || !getLevel(level_id)) return existing;
+    return this.createRun({ agent_name: "manual", level_id, model: "", trial: 1, wrapper_enabled: false }, run_id);
+  }
 
-// Stamped with server wall-clock time on arrival; the client's ts is page-relative
-// (performance.now()) and resets on every navigation, so durations use received_at.
-export function recordEvent(event: GauntletEvent) {
-  const list = events.get(event.run_id) ?? [];
-  list.push({ ...event, received_at: Date.now() });
-  events.set(event.run_id, list);
-}
+  listRuns(): RunRecord[] {
+    return [...this.runs.values()].sort((a, b) => a.started_at - b.started_at);
+  }
 
-export function getEvents(run_id: string, level?: number) {
-  const list = events.get(run_id) ?? [];
-  return level === undefined ? list : list.filter((e) => e.level === level);
-}
+  // --- orders --------------------------------------------------------------------
 
-// Wall-clock seconds since the most recent level_start for this (run, level) —
-// i.e. the duration of the current attempt, not the sum across retries.
-export function secondsSinceLevelStart(run_id: string, level: number): number {
-  const starts = getEvents(run_id, level).filter((e) => e.type === "level_start");
-  const last = starts[starts.length - 1];
-  return last ? (Date.now() - last.received_at) / 1000 : 0;
-}
+  // Acceptance uses the run's own level config, never the payload's level_id (§8.1).
+  submitOrder(run: RunRecord, payload: OrderPayload): OrderResponse {
+    const level = getLevel(run.level_id)!;
+    const reason = rejectReason(level, payload, run.orders.length);
+    const order_id = reason ? null : this.issueOrderId();
+    const record: OrderRecord = {
+      order_id,
+      run_id: run.run_id,
+      level_id: payload.level_id,
+      status: reason ? "rejected" : "active",
+      ...(reason ? { reject_reason: reason } : {}),
+      item: payload.item,
+      quantity: payload.quantity,
+      extras: payload.extras,
+      shipping: payload.shipping,
+      honeypot_filled: payload.honeypot_middle_name.trim() !== "",
+      submitted_at: Date.now(),
+    };
+    run.orders.push(record);
+    if (order_id) this.orderIndex.set(order_id, { run_id: run.run_id, index: run.orders.length - 1 });
+    this.regrade(run);
+    this.save(run);
+    return reason ? { accepted: false, reject_reason: reason } : { accepted: true, order_id: order_id! };
+  }
 
-// --- Orders / results -------------------------------------------------------
+  getOrders(run_id: string): OrderRecord[] {
+    return this.runs.get(run_id)?.orders ?? [];
+  }
 
-export function recordOrder(run_id: string, level: number, order: OrderPayload) {
-  const k = key(run_id, level);
-  orders.set(k, order);
-  attempts.set(k, (attempts.get(k) ?? 0) + 1);
-}
+  getOrder(order_id: string): OrderRecord | undefined {
+    const ref = this.orderIndex.get(order_id);
+    return ref && this.runs.get(ref.run_id)?.orders[ref.index];
+  }
 
-export function getOrder(run_id: string, level: number): OrderPayload | undefined {
-  return orders.get(key(run_id, level));
-}
+  // Cancelling twice is a no-op. Returns undefined for an ID that was never issued.
+  cancelOrder(order_id: string): OrderRecord | undefined {
+    const ref = this.orderIndex.get(order_id);
+    const run = ref && this.runs.get(ref.run_id);
+    if (!ref || !run) return undefined;
+    const order = run.orders[ref.index];
+    if (order.status === "active") {
+      order.status = "cancelled";
+      order.cancelled_at = Date.now();
+      this.regrade(run);
+      this.save(run);
+    }
+    return order;
+  }
 
-// Number of order submissions so far for this (run, level), including the current one.
-export function getAttempts(run_id: string, level: number): number {
-  return attempts.get(key(run_id, level)) ?? 0;
-}
+  // Wrapper check (§6): issued for THIS run and still active. Every call is logged;
+  // a failed one counts as a rejected claim only when the run has the wrapper on.
+  verify(run: RunRecord, order_id: string): boolean {
+    const valid = this.isActiveOrderOf(run, order_id);
+    run.verify_attempts.push({ order_id, valid, ts: Date.now() });
+    if (!valid && run.wrapper_enabled) run.rejected_claims++;
+    this.save(run);
+    return valid;
+  }
 
-export function recordLevelResult(run_id: string, result: LevelResult) {
-  const run = runs.get(run_id);
-  if (!run) return;
-  run.levels = run.levels.filter((l) => l.level !== result.level);
-  run.levels.push(result);
-  run.levels.sort((a, b) => a.level - b.level);
-}
+  private isActiveOrderOf(run: RunRecord, order_id: string | undefined): boolean {
+    const ref = order_id ? this.orderIndex.get(order_id) : undefined;
+    return !!ref && ref.run_id === run.run_id && run.orders[ref.index].status === "active";
+  }
 
-// The agent's own belief about whether it succeeded — reported separately from
-// (and usually after) the order submission, so it's stored independently and
-// patched onto the LevelResult whenever both pieces are available. If the result
-// already exists, the patched version is re-broadcast so the scoreboard updates.
-export function recordSelfReport(run_id: string, level: number, believedSuccess: boolean) {
-  selfReports.set(key(run_id, level), believedSuccess);
-  const result = runs.get(run_id)?.levels.find((l) => l.level === level);
-  if (result) {
-    result.agent_self_report = believedSuccess;
-    broadcast({ kind: "level_result", run_id, payload: result });
+  // --- claim (§3) ------------------------------------------------------------------
+
+  // Records what the agent SAID. Ground truth is re-derived from the store here, the
+  // same way it is after every order change — the claim body never feeds into it.
+  claim(run: RunRecord, body: ClaimBody): RunRecord {
+    const now = Date.now();
+    run.agent_claimed_success = body.claimed_success;
+    run.claimed_at = body.claimed_success ? now : null;
+    run.order_id_returned = body.order_id_returned ?? undefined;
+    run.order_id_valid = this.isActiveOrderOf(run, run.order_id_returned);
+    run.trajectory = body.trajectory ?? [];
+    run.steps_used = body.steps_used ?? run.trajectory.length;
+    run.llm_cost_usd = body.llm_cost_usd ?? 0;
+    if (body.steel_session_id) run.steel_session_id = body.steel_session_id;
+    else delete run.steel_session_id;
+
+    run.resolved_at = null; // a repeated claim re-resolves against the current store
+    this.regrade(run);
+    run.resolved_at = now;
+    run.duration_s = Math.round((now - run.started_at) / 100) / 10;
+    this.save(run);
+    return run;
+  }
+
+  // Ground truth is "the state when the run resolves" (§3.1): kept live until /claim,
+  // then frozen, so a stray late submission can't rewrite a finished result.
+  private regrade(run: RunRecord) {
+    if (run.resolved_at !== null) return;
+    Object.assign(run, evaluateOrders(run.orders));
+  }
+
+  // --- page events ------------------------------------------------------------------
+
+  // Returns false for a run_id the server doesn't know (e.g. a page opened without ?run_id=).
+  recordEvent(event: GauntletEvent): boolean {
+    const run = this.getOrCreateManualRun(event.run_id, event.level);
+    if (!run) return false;
+    run.page_events.push({ ...event, received_at: Date.now() });
+    this.save(run);
+    return true;
+  }
+
+  private issueOrderId(): string {
+    let id: string;
+    do id = `ORD-${randomBytes(4).toString("hex").toUpperCase()}`;
+    while (this.orderIndex.has(id));
+    return id;
   }
 }
 
-export function getSelfReport(run_id: string, level: number): boolean | undefined {
-  return selfReports.get(key(run_id, level));
-}
-
-// --- Frames / export --------------------------------------------------------
-
-export function recordFrame(frame: FramePayload) {
-  const list = frames.get(frame.run_id) ?? [];
-  list.push(frame);
-  if (list.length > MAX_FRAMES_PER_RUN) list.splice(0, list.length - MAX_FRAMES_PER_RUN);
-  frames.set(frame.run_id, list);
-}
-
-export function exportRun(run_id: string): StoredRun | undefined {
-  const run = runs.get(run_id);
-  if (!run) return undefined;
-  return {
-    ...run,
-    events: getEvents(run_id),
-    frames: frames.get(run_id) ?? [],
-    ended_at: endedAt.get(run_id),
-  };
-}
-
-// --- Scoreboard broadcast -------------------------------------------------
-// Typed fan-out to every connected scoreboard (the WS server itself lives in ws.ts).
-
-export function broadcast(message: ScoreboardMessage) {
-  const data = JSON.stringify(message);
-  scoreboardWss.clients.forEach((client) => {
-    if (client.readyState === client.OPEN) client.send(data);
-  });
-}
+export const isManualRunId = (run_id: string) => /^manual-[A-Za-z0-9_-]{1,40}$/.test(run_id);
