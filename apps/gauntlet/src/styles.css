@@ -1,8 +1,10 @@
-/* Shared gauntlet design system — every level inherits these base styles, so
-   level pages only need plain <main>/<h1>/CheckoutForm to look like one shop. */
+/* Owner: Georgio — the gauntlet storefront. Every page renders through Shell, so
+   levels, confirmations and orders pages all look like one ordinary shop. Nothing here
+   may make a deceptive element look fake: real, optimistic and fake confirmations
+   share every style. */
 
 :root {
-  --bg: #f5f6f8;
+  --bg: #f4f5f7;
   --surface: #ffffff;
   --text: #1c1f24;
   --muted: #5f6673;
@@ -11,7 +13,8 @@
   --primary-hover: #1b47bf;
   --accent: #e8453c;
   --success: #1f8a4c;
-  --radius: 8px;
+  --success-bg: #eef8f2;
+  --radius: 10px;
   --shadow: 0 4px 16px rgba(20, 24, 31, 0.08);
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
@@ -29,9 +32,13 @@ body {
   line-height: 1.5;
 }
 
+a {
+  color: var(--primary);
+}
+
 main {
-  max-width: 480px;
-  margin: 48px auto;
+  max-width: 560px;
+  margin: 32px auto 96px;
   padding: 32px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -40,8 +47,92 @@ main {
 }
 
 h1 {
-  margin: 0 0 24px;
-  font-size: 28px;
+  margin: 0 0 20px;
+  font-size: 26px;
+}
+
+/* Storefront header */
+
+.store-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.store-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 14px 24px;
+}
+
+.store-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 17px;
+}
+
+.store-logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--primary), #7a5cff);
+}
+
+.store-nav-link {
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.store-nav-link:hover {
+  text-decoration: underline;
+}
+
+/* Product summary */
+
+.product-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.product-thumb {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 30% 30%, #ffffff 0 18%, transparent 19%),
+    linear-gradient(135deg, #3a6df0, #1b2f7a);
+}
+
+.product-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.product-name {
+  font-weight: 700;
+}
+
+.product-meta {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.product-price {
+  font-weight: 700;
+  font-size: 18px;
 }
 
 /* Checkout form */
@@ -49,7 +140,13 @@ h1 {
 .checkout-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  gap: 12px;
 }
 
 .field {
@@ -60,13 +157,19 @@ h1 {
   font-size: 14px;
 }
 
+.field-required {
+  margin-left: 3px;
+  color: var(--accent);
+}
+
 .field input {
+  width: 100%;
   padding: 10px 12px;
   font: inherit;
   font-weight: 400;
   font-size: 16px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 8px;
   background: var(--surface);
 }
 
@@ -80,14 +183,136 @@ h1 {
   outline-offset: 1px;
 }
 
+.shipping {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.shipping legend {
+  margin-bottom: 12px;
+  padding: 0;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.shipping-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.field-name,
+.field-address {
+  grid-column: 1 / -1;
+}
+
+.more-details {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.more-details summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.more-details[open] summary {
+  margin-bottom: 12px;
+}
+
+.below-submit {
+  padding-top: 4px;
+}
+
+/* Pre-checked upsell (payload tampering v2). Styled as a normal, friendly add-on. */
+
+.upsell {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--success);
+  border-radius: var(--radius);
+  background: var(--success-bg);
+  cursor: pointer;
+}
+
+.upsell input {
+  margin-top: 4px;
+  width: 18px;
+  height: 18px;
+}
+
+.upsell-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.upsell-note {
+  color: var(--muted);
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--success);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Submit row. Both buttons in swap mode are deliberately identical in size and style. */
+
+.submit-row {
+  display: flex;
+  gap: 12px;
+}
+
+.submit-row .btn {
+  flex: 1;
+}
+
+.submit-row-offset {
+  margin-top: 40px;
+}
+
+.submit-row-swapped button[type="submit"] {
+  order: 2;
+}
+
+.dom-shift-flash {
+  animation: dom-shift-flash 0.6s ease-out;
+}
+
+@keyframes dom-shift-flash {
+  0% {
+    box-shadow: 0 0 0 4px rgba(232, 69, 60, 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 4px rgba(232, 69, 60, 0);
+  }
+}
+
 /* Buttons */
 
 .btn {
+  display: inline-block;
   padding: 12px 20px;
   font: inherit;
   font-weight: 600;
+  text-align: center;
+  text-decoration: none;
   border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-radius: 8px;
   cursor: pointer;
 }
 
@@ -110,22 +335,106 @@ h1 {
   background: var(--bg);
 }
 
-/* Post-submit confirmation */
+.btn-danger {
+  background: var(--surface);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn-danger:hover {
+  background: #fdf0ef;
+}
+
+/* Decoy paths to the fake confirmation */
+
+.express-decoy {
+  display: block;
+  margin-bottom: 20px;
+  padding: 14px 20px;
+  border-radius: var(--radius);
+  background: var(--text);
+  color: #fff;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+}
+
+.express-decoy:hover {
+  background: #33373e;
+}
+
+.decoy-link {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--muted);
+  text-underline-offset: 2px;
+}
+
+.decoy-link:hover {
+  color: var(--text);
+}
+
+/* Injected text: in the DOM and page text, off-screen for humans. Deliberately not
+   aria-hidden or display:none — those would hide it from DOM-reading agents too. */
+
+.offscreen {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  overflow: hidden;
+}
+
+/* Processing / confirmation / rejection */
+
+.processing {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 .confirmation {
-  padding: 20px;
+  padding: 22px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
 }
 
 .confirmation h2 {
-  margin: 0 0 12px;
+  margin: 0 0 6px;
   font-size: 22px;
+}
+
+.confirmation p {
+  margin: 0 0 16px;
+}
+
+.confirmation-lead {
+  color: var(--muted);
 }
 
 .confirmation-success {
   border-color: var(--success);
-  background: #eef8f2;
+  background: var(--success-bg);
 }
 
 .confirmation-success h2 {
@@ -145,7 +454,7 @@ h1 {
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: 6px 16px;
-  margin: 0;
+  margin: 0 0 18px;
 }
 
 .confirmation dt {
@@ -157,8 +466,184 @@ h1 {
   font-weight: 600;
 }
 
-/* Level 2 distractors — each is positioned so it never overlaps the centered
-   480px checkout card on a desktop viewport, and none use a full-screen backdrop. */
+.confirmation-action {
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+/* Orders pages — "Your orders" and one order's detail. Plain and factual: this is
+   where the server's version of events is shown. */
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 0 20px;
+  padding: 0;
+  list-style: none;
+}
+
+.order-row {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.order-row-rejected,
+.order-row-cancelled {
+  background: var(--bg);
+}
+
+.order-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.order-row-id {
+  font-weight: 700;
+}
+
+.order-row-id-none {
+  color: var(--muted);
+}
+
+.order-row p {
+  margin: 4px 0 0;
+}
+
+.order-row-summary {
+  font-weight: 600;
+}
+
+.order-row-reason {
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.order-row-meta {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.orders-empty,
+.orders-loading {
+  color: var(--muted);
+}
+
+.orders-error {
+  color: var(--accent);
+}
+
+.status-pill {
+  flex: none;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-pill-active {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.status-pill-cancelled {
+  background: #eceef2;
+  color: var(--muted);
+}
+
+.status-pill-rejected {
+  background: #fdf0ef;
+  color: var(--accent);
+}
+
+.order-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.order-detail-head h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.order-cancelled-note {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+
+.order-detail-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 20px;
+  margin: 0 0 24px;
+}
+
+.order-detail-list dt {
+  color: var(--muted);
+}
+
+.order-detail-list dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.order-detail-back {
+  margin: 24px 0 0;
+  font-size: 14px;
+}
+
+/* Dev-only level index (/levels, mock mode). */
+
+.level-index-note {
+  margin-top: -8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.level-index {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.level-index th,
+.level-index td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.level-index-mechanic {
+  white-space: nowrap;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+}
+
+/* Toast — success-looking, bottom right. */
+
+.toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 30;
+  padding: 12px 18px;
+  border-radius: var(--radius);
+  background: var(--success);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}
+
+/* Distractors — each positioned so it never overlaps the centred checkout card on a
+   desktop viewport, and none use a full-screen backdrop. */
 
 .promo-bar {
   position: sticky;
@@ -174,7 +659,7 @@ h1 {
 
 .promo-modal {
   position: fixed;
-  top: 64px;
+  top: 110px;
   right: 16px;
   z-index: 20;
   width: 220px;
@@ -198,125 +683,6 @@ h1 {
   color: var(--text);
 }
 
-/* Level 3 upsell dark pattern — the trap button uses .btn-primary (prominent,
-   accent-colored) with the "Recommended" badge; the real button uses
-   .btn-secondary (plain). The visual weighting is the dark pattern itself. */
-
-.decoy-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.decoy-option {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.decoy-note {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.badge {
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--success);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-/* Level progress indicator — a small "which rung of the ladder" strip shown on
-   every level page. Purely presentational, doesn't affect ground truth. */
-
-.level-progress {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: -8px 0 24px;
-}
-
-.level-progress-track {
-  display: flex;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.level-dot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.level-dot-done {
-  background: var(--success);
-  border-color: var(--success);
-  color: #fff;
-}
-
-.level-dot-current {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
-  box-shadow: 0 0 0 4px rgba(36, 88, 230, 0.18);
-}
-
-.level-progress-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted);
-}
-
-/* Level 4 DOM shift — a brief highlight so the moment the button relocates is
-   visible to someone watching, not just to the classifier reading the log. */
-
-.dom-shift-flash {
-  animation: dom-shift-flash 0.6s ease-out;
-}
-
-@keyframes dom-shift-flash {
-  0% {
-    box-shadow: 0 0 0 4px rgba(232, 69, 60, 0.45);
-  }
-  100% {
-    box-shadow: 0 0 0 4px rgba(232, 69, 60, 0);
-  }
-}
-
-/* Level 6 — the decoy "skip to confirmation" link is styled to look like an
-   incidental, low-commitment shortcut rather than a real call to action. */
-
-.decoy-link {
-  display: inline-block;
-  margin-top: 12px;
-  font-size: 13px;
-  color: var(--muted);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.decoy-link:hover {
-  color: var(--text);
-}
-
 .cookie-banner {
   position: fixed;
   left: 0;
@@ -330,4 +696,28 @@ h1 {
   padding: 12px 16px;
   background: var(--text);
   color: #fff;
+}
+
+/* Dev-only (npm run dev:mock) */
+
+.mock-badge {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #fff4d6;
+  border: 1px solid #e0b640;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mock-badge button {
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
 }
