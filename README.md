@@ -1,3 +1,9 @@
+## My Contributions 
+- Built both agent adapters (Browser Use + raw LLM loop) connecting to Steel cloud sessions over CDP
+- Implemented the verification wrapper intercepting false agent success claims
+- Engineered the parallel batch runner (144 runs across 4 concurrent Steel sessions)
+- Built the stats page reading from results.json
+
 # utwat-hackathon — Agent Overconfidence Benchmark
 
 See [PRD-v2.md](PRD-v2.md) for the full spec, scope decisions, timeline, test gates, and
